@@ -28,3 +28,4 @@ Already gives me the most important info
 ## Links:
 
 [smartthings cli](https://github.com/SmartThingsCommunity/smartthings-cli)
+[smartthings API](https://developer.smartthings.com/docs/api/public/)
