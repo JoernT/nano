@@ -25,7 +25,18 @@ Already gives me the most important info
 * use Grafana or similar to visualize (maybe only Fore + lib)
 
 
+## HomeBridge
+
+### install homebridge
+`npm install -g --unsafe-perm homebridge homebridge-config-ui-x`
+
+### start homebridge service
+`sudo hb-service install –-user homebridge`
+
 ## Links:
 
 [smartthings cli](https://github.com/SmartThingsCommunity/smartthings-cli)
+
+
+https://api.smartthings.com/v1/devices/5574bfcf-b397-8a39-88d3-000001200000/components/INDOOR2/status
 [smartthings API](https://developer.smartthings.com/docs/api/public/)

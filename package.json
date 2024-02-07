@@ -1,0 +1,30 @@
+{
+  "name": "nano",
+  "version": "1.0.0",
+  "description": "home automation",
+  "main": "index.js",
+  "scripts": {
+    "start": "web-dev-server --app-index doc/index.html",
+    "startnano": "node --experimental-modules src/nano.js",
+    "stop": "node --experimental-modules src/stop.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoernT/nano.git"
+  },
+  "author": "joern turner",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JoernT/nano/issues"
+  },
+  "homepage": "https://github.com/JoernT/nano#readme",
+  "dependencies": {
+    "@influxdata/influxdb-client": "^1.33.2",
+    "@jinntec/fore": "^1.10.3",
+    "axios": "^1.6.7"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@web/dev-server": "^0.4.2"
+  }
+}

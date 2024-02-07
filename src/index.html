@@ -1,0 +1,78 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes" name="viewport"/>
+
+    <title>Nano</title>
+    <link href="css/fore.css" rel="stylesheet"/>
+    <link href="css/toastify.css" rel="stylesheet"/>
+    <link href="css/vars.css" rel="stylesheet"/>
+    <link href="css/nano.css" rel="stylesheet"/>
+    <script type="module" src="scripts/fore-dev.js"></script>
+
+</head>
+<body>
+<div class="wrapper">
+    <fx-fore id="nano">
+
+        <fx-model>
+            <fx-action event="model-construct-done">
+                <fx-send submission="s-load-current"></fx-send>
+            </fx-action>
+            <fx-instance>
+                <data>
+                    <heating></heating>
+                    <warmwater></warmwater>
+                    <energy></energy>
+                </data>
+            </fx-instance>
+            <fx-instance id="response" type="json">{}</fx-instance>
+            <fx-instance id="vars">
+                <data>
+                    <device-id>5574bfcf-b397-8a39-88d3-000001200000</device-id>
+                    <token>be2d2c9e-34d2-4553-96f1-bc7e85881e3b</token>
+                    <locationid>1ed2a3d7-df09-4509-801e-9e0d9abad03c</locationid>
+                </data>
+            </fx-instance>
+            <fx-submission id="s-load-current"
+                           url="https://api.smartthings.com/v1/devices/{instance('vars')/device-id}/status"
+                           method="get"
+                           replace="instance"
+                           instance="response">
+                <fx-header name="Authorization" value="'Bearer ' || instance('vars')/token"></fx-header>
+                <fx-message event="submit-done">aktualisiert</fx-message>
+            </fx-submission>
+<!--            https://api.smartthings.com/v1/devices/5574bfcf-b397-8a39-88d3-000001200000/health?locationId=1ed2a3d7-df09-4509-801e-9e0d9abad03c-->
+        </fx-model>
+        <section class="current">
+            <section>
+                <header>Heizung</header>
+                <div class="measurement">
+                    <img class="icon" src="images/heater.png">
+                    {instance('response')?components?INDOOR2?temperatureMeasurement?temperature?value}°</div>
+            </section>
+            <section>
+                <header>Warmwasser</header>
+                <div class="measurement">
+                    <img class="icon" src="images/drop.png">
+                    {instance('response')?components?main?temperatureMeasurement?temperature?value}°
+                    <img class="icon action boost" src="images/arrows.png">
+                </div>
+            </section>
+            <section>
+                <header>Energie</header>
+                <div class="measurement">
+                    <img class="icon" src="images/supply.png">
+                    <span>{instance('response')?components?main?powerConsumptionReport?powerConsumption?value?power}</span>
+                    <span class="unit"> kWh</span></div>
+            </section>
+            <fx-trigger>
+                <img class="icon action reload" src="images/refresh.png">
+                <fx-send submission="s-load-current"></fx-send>
+            </fx-trigger>
+        </section>
+
+    </fx-fore>
+</div>
+</body>
+</html>
