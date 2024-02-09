@@ -3,8 +3,6 @@ import axios from 'axios';
 import {tokens} from "./config.js";
 import {InfluxDB, Point} from '@influxdata/influxdb-client';
 
-
-
 export class Nano {
 
     constructor() {
@@ -17,7 +15,7 @@ export class Nano {
         this.apiEndpoints = [
             {
                 url: `https://api.smartthings.com/v1/devices/${tokens.smartthings.device}/status`,
-                interval: 1000 * 60 * 3,
+                interval: 1000 * 60 * 5,
                 token: tokens.smartthings.token,
             },
 /*
