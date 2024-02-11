@@ -21,7 +21,9 @@
   "dependencies": {
     "@influxdata/influxdb-client": "^1.33.2",
     "@jinntec/fore": "^1.10.3",
-    "axios": "^1.6.7"
+    "apexcharts": "^3.45.2",
+    "axios": "^1.6.7",
+    "openmeteo": "^1.1.3"
   },
   "type": "module",
   "devDependencies": {
