@@ -110,7 +110,7 @@ export class Nano {
                 const direct = directs[i];
                 const diffuse = diffuses[i];
                 console.log(time,duration,direct,diffuse);
-                // await this.writeData('foo','sunshine', 'location', 'Berlin', 'duration', duration);
+                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'duration', duration);
                 // await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'direct', direct);
                 // await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'diffuse', diffuse);
             }
