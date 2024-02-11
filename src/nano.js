@@ -16,7 +16,7 @@ export class Nano {
             {
                 name:'smartthings',
                 url: `https://api.smartthings.com/v1/devices/${tokens.smartthings.device}/status`,
-                interval: 1000 * 60,
+                interval: 1000 * 60 * 5,
                 token: tokens.smartthings.token,
             },
             {
