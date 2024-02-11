@@ -19,11 +19,13 @@ export class Nano {
                 interval: 1000 * 60 * 5,
                 token: tokens.smartthings.token,
             },
+/*
             {
                 name: 'DWD-hourly-sunshine-duration-direct-diffuse',
                 url: 'https://api.open-meteo.com/v1/dwd-icon?latitude=52.4333&longitude=13.3076&hourly=sunshine_duration,direct_radiation_instant,diffuse_radiation_instant&timezone=Europe%2FBerlin',
                 interval: 1000 * 60 * 60,
             },
+*/
             // Add more endpoints as need
         ];
 
