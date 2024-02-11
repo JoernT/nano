@@ -127,33 +127,39 @@ export class Nano {
         const token = tokens.influxDB;
         const org = this.influxConf.org;
         // const bucket = this.influxConf.bucket;
-        /**
-         * Instantiate the InfluxDB client
-         * with a configuration object.
-         **/
-        const influxDB = new InfluxDB({url, token})
-        /**
-         * Create a write client from the getWriteApi method.
-         * Provide your `org` and `bucket`.
-         **/
-        const writeApi = influxDB.getWriteApi(org, bucket)
 
-        /**
-         * Apply default tags to all points.
-         **/
-            // writeApi.useDefaultTags({ region: 'west' })
-        const point1 = new Point(measurement)
-                .tag(tagName, tagValue)
-                .floatField(fieldName, fieldValue)
-        console.log(` ${point1}`)
-        writeApi.writePoint(point1)
+        try{
+            /**
+             * Instantiate the InfluxDB client
+             * with a configuration object.
+             **/
+            const influxDB = new InfluxDB({url, token})
+            /**
+             * Create a write client from the getWriteApi method.
+             * Provide your `org` and `bucket`.
+             **/
+            const writeApi = influxDB.getWriteApi(org, bucket)
 
-        /**
-         * Flush pending writes and close writeApi.
-         **/
-        writeApi.close().then(() => {
-            console.log('WRITE FINISHED')
-        })
+            /**
+             * Apply default tags to all points.
+             **/
+                // writeApi.useDefaultTags({ region: 'west' })
+            const point1 = new Point(measurement)
+                    .tag(tagName, tagValue)
+                    .floatField(fieldName, fieldValue)
+            console.log(` ${point1}`)
+            writeApi.writePoint(point1)
+
+            /**
+             * Flush pending writes and close writeApi.
+             **/
+            writeApi.close().then(() => {
+                console.log('WRITE FINISHED')
+            })
+        }catch(e){
+            console.error(e.message);
+        }
+
 
 
     }
