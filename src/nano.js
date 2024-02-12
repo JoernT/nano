@@ -98,14 +98,13 @@ export class Nano {
             await this.writeData('nano','energy', 'component', 'heatpump', 'power', energy);
         }
 
+/*
         if (endpoint.name === 'DWD-hourly-sunshine-duration-direct-diffuse') {
             // console.log('pulling sunshine', data)
             const times = data.hourly.time;
             const durations = data.hourly.sunshine_duration;
             const directs = data.hourly.direct_radiation_instant;
             const diffuses = data.hourly.diffuse_radiation_instant;
-            // console.log('times', times);
-            // console.log('durations', durations);
             for (let i = 0; i < times.length; i++) {
                 const time = times[i];
                 const duration = durations[i];
@@ -113,10 +112,11 @@ export class Nano {
                 const diffuse = diffuses[i];
                 console.log(time,duration,direct,diffuse);
                 await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'duration', duration);
-                // await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'direct', direct);
-                // await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'diffuse', diffuse);
+                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'direct', direct);
+                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'diffuse', diffuse);
             }
         }
+*/
 
     }
 
