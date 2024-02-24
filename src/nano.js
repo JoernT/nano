@@ -16,7 +16,7 @@ export class Nano {
             {
                 name:'smartthings',
                 url: `https://api.smartthings.com/v1/devices/${tokens.smartthings.device}/status`,
-                interval: 1000 * 60 * 4,
+                interval: 1000 * 60,
                 token: tokens.smartthings.token,
             },
 /*
@@ -92,7 +92,7 @@ export class Nano {
         if (endpoint.name === 'smartthings') {
             const heating = data.components.INDOOR2.temperatureMeasurement.temperature.value || 0;
             const warmwater = data.components.main.temperatureMeasurement.temperature.value || 0;
-            const power = data.components.main.powerConsumptionReport.powerConsumption.value.power || 0;
+            const power = (data.components.main.powerConsumptionReport.powerConsumption.value.power || 0) * 1000;
             const delta = data.components.main.powerConsumptionReport.powerConsumption.value.deltaEnergy || 0;
             const energy = data.components.main.powerConsumptionReport.powerConsumption.value.energy || 0;
             const powerEnergy = data.components.main.powerConsumptionReport.powerConsumption.value.powerEnergy || 0;
