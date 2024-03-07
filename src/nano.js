@@ -94,7 +94,9 @@ export class Nano {
             const warmwater = data.components.main.temperatureMeasurement.temperature.value || 0;
             const power = (data.components.main.powerConsumptionReport.powerConsumption.value.power || 0) * 1000;
             const delta = data.components.main.powerConsumptionReport.powerConsumption.value.deltaEnergy || 0;
-            const energy = data.components.main.powerConsumptionReport.powerConsumption.value.energy || 0;
+            const energy =  data.components.main.powerConsumptionReport.powerConsumption.value.energy / 1000;
+            console.log('energy raw', data.components.main.powerConsumptionReport.powerConsumption.value.energy)
+            console.log('energy written', energy)
             const powerEnergy = data.components.main.powerConsumptionReport.powerConsumption.value.powerEnergy || 0;
             const energySaved = data.components.main.powerConsumptionReport.powerConsumption.value.energySaved || 0;
 
