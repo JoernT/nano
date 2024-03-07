@@ -60,3 +60,5 @@ Based on the definition above, energy is not cumulative, rather will get reset e
 used (on-going), you'll need to create a separate sensor for total energy that adds the value of energy whenever it's updated (when a new report comes out).
 
 I'm happy to submit a PR for this, unless @JPHutchins wants to. 😄
+
+test
