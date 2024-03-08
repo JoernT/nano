@@ -94,24 +94,28 @@ export class Nano {
         // console.log('extractAndStoreData.responseData', data)
 
         if (endpoint.name === 'smartthings') {
-            const heating = data.components.INDOOR2.temperatureMeasurement.temperature.value || 0;
-            const warmwater = data.components.main.temperatureMeasurement.temperature.value || 0;
-            const power = (data.components.main.powerConsumptionReport.powerConsumption.value.power || 0) * 1000;
-            const delta = data.components.main.powerConsumptionReport.powerConsumption.value.deltaEnergy || 0;
-            const energy =  data.components.main.powerConsumptionReport.powerConsumption.value.energy / 1000;
-            console.log('energy raw', data.components.main.powerConsumptionReport.powerConsumption.value.energy)
-            console.log('energy written', energy)
-            const powerEnergy = data.components.main.powerConsumptionReport.powerConsumption.value.powerEnergy || 0;
-            const energySaved = data.components.main.powerConsumptionReport.powerConsumption.value.energySaved || 0;
+            try{
+                const heating = data.components.INDOOR2.temperatureMeasurement.temperature.value || 0;
+                const warmwater = data.components.main.temperatureMeasurement.temperature.value || 0;
+                const power = (data.components.main.powerConsumptionReport.powerConsumption.value.power || 0) * 1000;
+                const delta = data.components.main.powerConsumptionReport.powerConsumption.value.deltaEnergy || 0;
+                const energy =  data.components.main.powerConsumptionReport.powerConsumption.value.energy / 1000;
+                console.log('energy raw', data.components.main.powerConsumptionReport.powerConsumption.value.energy)
+                console.log('energy written', energy)
+                const powerEnergy = data.components.main.powerConsumptionReport.powerConsumption.value.powerEnergy || 0;
+                const energySaved = data.components.main.powerConsumptionReport.powerConsumption.value.energySaved || 0;
 
-            await this.writeData('nano','temperature', 'component', 'heating', 'temp', heating);
-            await this.writeData('nano','temperature', 'component', 'warmwater', 'temp', warmwater);
+                await this.writeData('nano','temperature', 'component', 'heating', 'temp', heating);
+                await this.writeData('nano','temperature', 'component', 'warmwater', 'temp', warmwater);
 
-            await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'power', power);
-            await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energy', energy);
-            await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'deltaEnergy', delta);
-            await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'powerEnergy', powerEnergy);
-            await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energySaved', energySaved);
+                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'power', power);
+                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energy', energy);
+                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'deltaEnergy', delta);
+                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'powerEnergy', powerEnergy);
+                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energySaved', energySaved);
+            } catch (e){
+                console.log('error while extracting data', e.message);
+            }
         }
 
 /*
