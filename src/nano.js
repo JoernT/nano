@@ -50,10 +50,14 @@ export class Nano {
     }
 
     request(endpoint) {
-        this.fetchData(endpoint)
-            .then(data => {
-                this.extractData(data, endpoint);
-            })
+        try{
+            this.fetchData(endpoint)
+                .then(data => {
+                    this.extractData(data, endpoint);
+                })
+        }catch(e){
+            console.log("connection error", e.message);
+        }
     }
 
     async fetchData(endpointConfig) {
