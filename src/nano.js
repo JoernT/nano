@@ -178,6 +178,16 @@ function startStatusServer(config, status) {
     const server = createServer((req, res) => {
         const v = status.values;
         const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(x.value) + unit : '–'}</td><td>${x?.at ? 'device: ' + ago(x.at) : ''}</td></tr>`;
+        if (req.url === '/api/status' && req.method === 'OPTIONS') {
+            // CORS preflight from the dashboard (served from another port)
+            res.writeHead(204, {
+                'access-control-allow-origin': '*',
+                'access-control-allow-methods': 'GET, OPTIONS',
+                'access-control-allow-headers': '*',
+                'access-control-max-age': '600',
+            });
+            return res.end();
+        }
         if (req.url === '/api/status') {
             // read-only copy of the last device status for the dashboard (src/index.html); no token needed
             if (!status.latestRaw) { res.writeHead(503, {'access-control-allow-origin': '*'}); return res.end('no data yet'); }

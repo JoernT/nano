@@ -4,7 +4,9 @@
   "description": "home automation",
   "main": "index.js",
   "scripts": {
-    "start": "web-dev-server --app-index doc/index.html",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "startnano": "node --env-file-if-exists=.env src/nano.js",
     "test": "node --test test/*.test.js"
   },
@@ -27,6 +29,6 @@
   },
   "type": "module",
   "devDependencies": {
-    "@web/dev-server": "^0.4.2"
+    "vite": "^8.3.6"
   }
 }

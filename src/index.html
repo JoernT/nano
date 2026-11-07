@@ -9,8 +9,8 @@
     <link href="css/vars.css" rel="stylesheet"/>
     <link href="css/nano.css" rel="stylesheet"/>
     <script type="module">
-        import './scripts/fore.js';
-        import ApexCharts from '../node_modules/apexcharts/dist/apexcharts.esm.js';
+        // pinned to the version in package.json; swap for a bundled import when going offline
+        import 'https://cdn.jsdelivr.net/npm/@jinntec/fore@1.10.3/dist/fore.js';
     </script>
 
 </head>
@@ -67,7 +67,7 @@
                 <header>Energie</header>
                 <div class="measurement">
                     <img class="icon" src="images/supply.png">
-                    <span>{round(instance('response')?components?main?powerConsumptionReport?powerConsumption?value?power,2)}</span>
+                    <span>{round(instance('response')?components?main?powerConsumptionReport?powerConsumption?value?power * 1000,0)}</span>
                     <span class="unit"> W</span></div>
             </section>
         </section>
