@@ -1,198 +1,211 @@
-// pollerFunctions.mjs
+// Polls the Samsung heat pump via the SmartThings API and stores the readings in InfluxDB.
+//
+// Configuration (environment variables, e.g. in a .env file, see .env.example):
+//   SMARTTHINGS_TOKEN   personal access token (with or without the "Bearer " prefix)
+//   SMARTTHINGS_DEVICE  device id
+//   INFLUX_URL          default http://localhost:8086
+//   INFLUX_TOKEN, INFLUX_ORG (default nanoCorp), INFLUX_BUCKET (default nano)
+//   POLL_INTERVAL_SEC   default 240
+// If SMARTTHINGS_* / INFLUX_TOKEN are unset, the legacy src/config.js is used as a fallback.
+//
+// Every point carries the timestamp the *device* reported, not the poll time. Writing the same
+// series+timestamp twice is idempotent in InfluxDB, so overlapping polls never create duplicates.
 import axios from 'axios';
-import {tokens} from "./config.js";
 import {InfluxDB, Point} from '@influxdata/influxdb-client';
+import {pathToFileURL} from 'node:url';
+import {createServer} from 'node:http';
 
-export class Nano {
+const log = (...a) => console.log(new Date().toISOString(), ...a);
 
-    constructor() {
-        this.intervalIds = [];
-        this.influxConf = {
-            url: 'http://localhost:8086',
-            org: 'nanoCorp',
-            bucket: 'nano'
-        }
-        this.apiEndpoints = [
-            {
-                name:'smartthings',
-                url: `https://api.smartthings.com/v1/devices/${tokens.smartthings.device}/status`,
-                interval: 1000 * 60 * 4,
-                token: tokens.smartthings.token,
-            },
-/*
-            {
-                name: 'DWD-hourly-sunshine-duration-direct-diffuse',
-                url: 'https://api.open-meteo.com/v1/dwd-icon?latitude=52.4333&longitude=13.3076&hourly=sunshine_duration,direct_radiation_instant,diffuse_radiation_instant&timezone=Europe%2FBerlin',
-                interval: 1000 * 60 * 60,
-            },
-*/
-            // Add more endpoints as need
-        ];
-
-    }
-
-
-    startPolling() {
-        this.apiEndpoints.forEach(endpoint => {
-            this.request(endpoint);
-
-            this.intervalIds[endpoint.url] = setInterval(() => {
-                console.log('fetching', endpoint.name);
-                this.request(endpoint);
-                /*
-                                this.fetchData(endpoint)
-                                    .then(data => {
-                                        this.extractData(data, endpoint);
-                                    })
-                */
-            }, endpoint.interval);
-        });
-    }
-
-    request(endpoint) {
-        try{
-            this.fetchData(endpoint)
-                .then(data => {
-                    this.extractData(data, endpoint);
-                })
-        }catch(e){
-            console.log("connection error", e.message);
-        }
-    }
-
-    async fetchData(endpointConfig) {
-        console.log('fetchData', endpointConfig.url, endpointConfig.interval);
+async function loadConfig(env = process.env) {
+    let legacy = {};
+    if (!env.SMARTTHINGS_TOKEN || !env.SMARTTHINGS_DEVICE || !env.INFLUX_TOKEN) {
         try {
-            let response;
-            if (endpointConfig.token) {
-                response = await axios.get(endpointConfig.url, {
-                    headers: {
-                        'Authorization': `${tokens.smartthings.token}`
-                    }
-                })
-            } else {
-                // anonymous API requires no token
-                response = await axios.get(endpointConfig.url, {})
-            }
-            return response.data;
-        } catch (error) {
-            if (error.response) {
-                // The request was made, but the server responded with a status code outside of the 2xx range
-                console.error(`Error from ${endpointConfig.url}. Status code: ${error.response.status}, Message: ${error.response.data}`);
-            } else if (error.request) {
-                // The request was made, but no response was received
-                console.error(`No response received from ${endpointConfig.url}.`);
-            } else {
-                // Something happened in setting up the request that triggered an Error
-                console.error(`Error setting up the request for ${endpointConfig.url}:`, error.message);
-            }
-        }
+            legacy = (await import('./config.js')).tokens || {};
+        } catch { /* no legacy config */ }
     }
-
-    async extractData(data, endpoint) {
-        // ?components?INDOOR2?temperatureMeasurement?temperature?value
-        // console.log('extractAndStoreData.responseData', data)
-
-        if (endpoint.name === 'smartthings') {
-            try{
-                const heating = data.components.INDOOR2.temperatureMeasurement.temperature.value || 0;
-                const warmwater = data.components.main.temperatureMeasurement.temperature.value || 0;
-                const power = (data.components.main.powerConsumptionReport.powerConsumption.value.power || 0) * 1000;
-                const delta = data.components.main.powerConsumptionReport.powerConsumption.value.deltaEnergy || 0;
-                const energy =  data.components.main.powerConsumptionReport.powerConsumption.value.energy / 1000;
-                console.log('energy raw', data.components.main.powerConsumptionReport.powerConsumption.value.energy)
-                console.log('energy written', energy)
-                const powerEnergy = data.components.main.powerConsumptionReport.powerConsumption.value.powerEnergy || 0;
-                const energySaved = data.components.main.powerConsumptionReport.powerConsumption.value.energySaved || 0;
-
-                await this.writeData('nano','temperature', 'component', 'heating', 'temp', heating);
-                await this.writeData('nano','temperature', 'component', 'warmwater', 'temp', warmwater);
-
-                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'power', power);
-                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energy', energy);
-                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'deltaEnergy', delta);
-                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'powerEnergy', powerEnergy);
-                await this.writeData('nano','powerconsumption', 'component', 'heatpump', 'energySaved', energySaved);
-            } catch (e){
-                console.log('error while extracting data', e.message);
-            }
-        }
-
-/*
-        if (endpoint.name === 'DWD-hourly-sunshine-duration-direct-diffuse') {
-            // console.log('pulling sunshine', data)
-            const times = data.hourly.time;
-            const durations = data.hourly.sunshine_duration;
-            const directs = data.hourly.direct_radiation_instant;
-            const diffuses = data.hourly.diffuse_radiation_instant;
-            for (let i = 0; i < times.length; i++) {
-                const time = times[i];
-                const duration = durations[i];
-                const direct = directs[i];
-                const diffuse = diffuses[i];
-                console.log(time,duration,direct,diffuse);
-                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'duration', duration);
-                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'direct', direct);
-                await this.writeData('sunshine','sunshine', 'location', 'Berlin', 'diffuse', diffuse);
-            }
-        }
-*/
-
-    }
-
-    async writeData(bucket, measurement, tagName, tagValue, fieldName, fieldValue) {
-
-        console.log('write to bucket', bucket);
-        console.log('measurement', measurement);
-        console.log('influxConf', this.influxConf);
-        const url = this.influxConf.url;
-        const token = tokens.influxDB;
-        const org = this.influxConf.org;
-        // const bucket = this.influxConf.bucket;
-
-        try{
-            /**
-             * Instantiate the InfluxDB client
-             * with a configuration object.
-             **/
-            const influxDB = new InfluxDB({url, token})
-            /**
-             * Create a write client from the getWriteApi method.
-             * Provide your `org` and `bucket`.
-             **/
-            const writeApi = influxDB.getWriteApi(org, bucket)
-
-            /**
-             * Apply default tags to all points.
-             **/
-                // writeApi.useDefaultTags({ region: 'west' })
-            const point1 = new Point(measurement)
-                    .tag(tagName, tagValue)
-                    .floatField(fieldName, fieldValue)
-            console.log(` ${point1}`)
-            writeApi.writePoint(point1)
-
-            /**
-             * Flush pending writes and close writeApi.
-             **/
-            writeApi.close().then(() => {
-                console.log(`WRITE FINISHED - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`)
-            })
-        }catch(e){
-            console.error(e.message);
-        }
-
-
-
-    }
-
-
-    stopPolling(intervalId) {
-        clearInterval(intervalId);
-    }
-
-
+    const token = env.SMARTTHINGS_TOKEN || legacy.smartthings?.token;
+    const device = env.SMARTTHINGS_DEVICE || legacy.smartthings?.device;
+    const influxToken = env.INFLUX_TOKEN || legacy.influxDB;
+    const missing = [!token && 'SMARTTHINGS_TOKEN', !device && 'SMARTTHINGS_DEVICE', !influxToken && 'INFLUX_TOKEN'].filter(Boolean);
+    if (missing.length) throw new Error(`Missing configuration: ${missing.join(', ')}`);
+    return {
+        smartthings: {
+            token: /^bearer /i.test(token) ? token : `Bearer ${token}`,
+            url: `https://api.smartthings.com/v1/devices/${device}/status`,
+        },
+        influx: {
+            url: env.INFLUX_URL || 'http://localhost:8086',
+            token: influxToken,
+            org: env.INFLUX_ORG || 'nanoCorp',
+            bucket: env.INFLUX_BUCKET || 'nano',
+        },
+        intervalMs: Number(env.POLL_INTERVAL_SEC || 240) * 1000,
+    };
 }
 
-new Nano().startPolling();
-// pullSunshine();
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+const ts = (attr) => (attr?.timestamp ? new Date(attr.timestamp) : undefined);
+
+/**
+ * Turns a SmartThings /status response into a list of plain point descriptors:
+ * {measurement, tags, fields: {name: number|string}, time?: Date}
+ * Missing capabilities are skipped instead of being written as 0.
+ */
+export function extractPoints(data) {
+    const points = [];
+    const add = (measurement, tags, fields, time) => {
+        const f = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && v !== null));
+        if (Object.keys(f).length) points.push({measurement, tags, fields: f, time});
+    };
+    const c = data?.components || {};
+
+    // temperatures: INDOOR2 is the heating circuit, main the warm water tank
+    for (const [component, name] of [['INDOOR2', 'heating'], ['main', 'warmwater'], ['INDOOR1', 'indoor1']]) {
+        const attr = c[component]?.temperatureMeasurement?.temperature;
+        add('temperature', {component: name}, {temp: num(attr?.value)}, ts(attr));
+    }
+
+    // power: `power` is reported in kW (-> W), `energy` in Wh (-> kWh)
+    const pc = c.main?.powerConsumptionReport?.powerConsumption;
+    const v = pc?.value;
+    if (v) {
+        add('powerconsumption', {component: 'heatpump'}, {
+            power: num(v.power) !== undefined ? v.power * 1000 : undefined,
+            energy: num(v.energy) !== undefined ? v.energy / 1000 : undefined,
+            deltaEnergy: num(v.deltaEnergy),
+            powerEnergy: num(v.powerEnergy),
+            energySaved: num(v.energySaved),
+        }, ts(pc));
+    }
+
+    // state: on/off and operating mode as strings
+    for (const [component, name] of [['main', 'warmwater'], ['INDOOR2', 'heating'], ['INDOOR1', 'indoor1']]) {
+        const sw = c[component]?.switch?.switch;
+        const mode = c[component]?.airConditionerMode?.airConditionerMode;
+        if (sw?.value) add('state', {component: name, attribute: 'switch'}, {value: sw.value}, ts(sw));
+        if (mode?.value) add('state', {component: name, attribute: 'mode'}, {value: mode.value}, ts(mode));
+    }
+
+    // raw Samsung cycle data (5 min samples, hex blobs, format not yet decoded) - keep it verbatim
+    const cycle = c.main?.['samsungce.ehsCycleData'] || {};
+    for (const kind of ['outdoor', 'indoor']) {
+        for (const e of cycle[kind]?.value || []) {
+            if (e?.data && e?.timestamp) add('ehs_cycle', {kind}, {raw: e.data}, new Date(e.timestamp));
+        }
+    }
+    return points;
+}
+
+async function fetchStatus({url, token}) {
+    const res = await axios.get(url, {headers: {Authorization: token}, timeout: 20_000});
+    return res.data;
+}
+
+// latest value per series, for the status page
+function summarize(points) {
+    const t = (m, tag, field) => {
+        const p = points.find((x) => x.measurement === m && Object.values(x.tags).includes(tag) && field in x.fields);
+        return p ? {value: p.fields[field], at: p.time} : undefined;
+    };
+    return {
+        heating: t('temperature', 'heating', 'temp'),
+        warmwater: t('temperature', 'warmwater', 'temp'),
+        power: t('powerconsumption', 'heatpump', 'power'),
+        energy: t('powerconsumption', 'heatpump', 'energy'),
+        mode: t('state', 'mode', 'value'),
+        cycleSamples: points.filter((p) => p.measurement === 'ehs_cycle').length,
+    };
+}
+
+// tiny read-only status page: http://localhost:8787 (STATUS_PORT=0 disables, STATUS_HOST to expose)
+function startStatusServer(config, status) {
+    const port = Number(process.env.STATUS_PORT ?? 8787);
+    if (!port) return null;
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
+    const ago = (d) => (d ? `${Math.round((Date.now() - d) / 1000)}s ago` : 'never');
+    const server = createServer((req, res) => {
+        const v = status.values;
+        const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(x.value) + unit : '–'}</td><td>${x?.at ? 'device: ' + ago(x.at) : ''}</td></tr>`;
+        if (req.url === '/status.json') {
+            res.writeHead(200, {'content-type': 'application/json'});
+            return res.end(JSON.stringify(status));
+        }
+        const stale = !status.lastPollAt || Date.now() - status.lastPollAt > config.intervalMs * 2.5;
+        res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+        res.end(`<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=20><title>nano</title>
+<style>body{font:15px system-ui;margin:2rem auto;max-width:34rem;padding:0 1rem}td{padding:.2rem .8rem .2rem 0}.ok{color:#2a7}.bad{color:#c33}pre{background:#f4f4f4;padding:.6rem;overflow:auto}</style>
+<h2>nano <span class=${stale || status.lastError ? 'bad' : 'ok'}>${stale ? 'STALE' : status.lastError ? 'ERROR' : 'running'}</span></h2>
+<p>last poll: ${ago(status.lastPollAt)} · polls ${status.polls} · failures ${status.failures} · every ${config.intervalMs / 1000}s<br>
+${status.lastError ? `<span class=bad>${esc(status.lastError)}</span><br>` : ''}uptime since ${status.startedAt.toLocaleString()}</p>
+<table>${row('Heizung', v.heating, ' °C')}${row('Warmwasser', v.warmwater, ' °C')}${row('Leistung', v.power, ' W')}${row('Energie', v.energy, ' kWh')}${row('Modus', v.mode)}
+<tr><td>cycle samples</td><td>${v.cycleSamples ?? '–'}</td><td></td></tr></table>
+<h3>recent</h3><pre>${esc(status.events.join('\n'))}</pre>`);
+    });
+    server.on('error', (e) => log('status server:', e.message));
+    server.listen(port, process.env.STATUS_HOST || '127.0.0.1', () => log(`status page: http://localhost:${port}`));
+    return server;
+}
+
+export async function startPolling(config) {
+    const influx = new InfluxDB({url: config.influx.url, token: config.influx.token});
+    const writeApi = influx.getWriteApi(config.influx.org, config.influx.bucket, 'ns', {
+        // retry later if Influx is briefly unavailable
+        maxRetries: 5,
+        writeFailed: (err, lines) => { log('influx write failed:', err.message, `(${lines.length} lines)`); },
+    });
+
+    const status = {startedAt: new Date(), polls: 0, failures: 0, lastPollAt: null, lastError: null, points: 0, values: {}, events: []};
+    const note = (msg) => { status.events.unshift(`${new Date().toLocaleTimeString()}  ${msg}`); status.events.length = Math.min(status.events.length, 15); };
+    const server = startStatusServer(config, status);
+
+    let running = false;
+    const poll = async () => {
+        if (running) return log('previous poll still running, skipping');
+        running = true;
+        try {
+            const data = await fetchStatus(config.smartthings);
+            const points = extractPoints(data);
+            status.values = summarize(points);
+            for (const p of points) {
+                const pt = new Point(p.measurement);
+                for (const [k, val] of Object.entries(p.tags)) pt.tag(k, val);
+                for (const [k, val] of Object.entries(p.fields)) {
+                    typeof val === 'string' ? pt.stringField(k, val) : pt.floatField(k, val);
+                }
+                if (p.time) pt.timestamp(p.time);
+                writeApi.writePoint(pt);
+            }
+            await writeApi.flush();
+            status.polls++; status.points = points.length; status.lastPollAt = new Date(); status.lastError = null;
+            log(`polled: ${points.length} points written`);
+            note(`ok, ${points.length} points`);
+        } catch (e) {
+            const http = e.response ? ` (HTTP ${e.response.status})` : '';
+            status.failures++; status.lastError = `${e.message}${http}`;
+            log(`poll failed${http}:`, e.message);
+            note(`FAILED${http}: ${e.message}`);
+        } finally {
+            running = false;
+        }
+    };
+
+    await poll();
+    const timer = setInterval(poll, config.intervalMs);
+    const shutdown = async () => {
+        clearInterval(timer);
+        server?.close();
+        try { await writeApi.close(); } catch (e) { log('flush on shutdown failed:', e.message); }
+        process.exit(0);
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    log(`polling every ${config.intervalMs / 1000}s -> ${config.influx.url} bucket ${config.influx.bucket}`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    loadConfig().then(startPolling).catch((e) => {
+        console.error(e.message);
+        process.exit(1);
+    });
+}

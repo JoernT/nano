@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "web-dev-server --app-index doc/index.html",
-    "startnano": "node --experimental-modules src/nano.js",
-    "stop": "node --experimental-modules src/stop.mjs"
+    "startnano": "node --env-file-if-exists=.env src/nano.js",
+    "test": "node --test test/*.test.js"
   },
   "repository": {
     "type": "git",

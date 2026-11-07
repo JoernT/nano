@@ -1,3 +1,5 @@
 .idea/
 src/config.js
 dump.json
+.env
+data/
