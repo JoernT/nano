@@ -12,8 +12,9 @@
 // series+timestamp twice is idempotent in InfluxDB, so overlapping polls never create duplicates.
 import axios from 'axios';
 import {InfluxDB, Point} from '@influxdata/influxdb-client';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
+import {SmartThingsAuth} from './smartthings-auth.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -27,11 +28,18 @@ async function loadConfig(env = process.env) {
     const token = env.SMARTTHINGS_TOKEN || legacy.smartthings?.token;
     const device = env.SMARTTHINGS_DEVICE || legacy.smartthings?.device;
     const influxToken = env.INFLUX_TOKEN || legacy.influxDB;
-    const missing = [!token && 'SMARTTHINGS_TOKEN', !device && 'SMARTTHINGS_DEVICE', !influxToken && 'INFLUX_TOKEN'].filter(Boolean);
+    const oauth = Boolean(env.ST_CLIENT_ID && env.ST_CLIENT_SECRET);
+    const missing = [!token && !oauth && 'SMARTTHINGS_TOKEN (or ST_CLIENT_ID + ST_CLIENT_SECRET)', !device && 'SMARTTHINGS_DEVICE', !influxToken && 'INFLUX_TOKEN'].filter(Boolean);
     if (missing.length) throw new Error(`Missing configuration: ${missing.join(', ')}`);
     return {
         smartthings: {
-            token: /^bearer /i.test(token) ? token : `Bearer ${token}`,
+            auth: new SmartThingsAuth({
+                clientId: env.ST_CLIENT_ID,
+                clientSecret: env.ST_CLIENT_SECRET,
+                tokenFile: resolveTokenFile(env),
+                tokenUrl: env.ST_TOKEN_URL || undefined,
+                staticToken: token && (/^bearer /i.test(token) ? token : `Bearer ${token}`),
+            }),
             url: `https://api.smartthings.com/v1/devices/${device}/status`,
         },
         influx: {
@@ -87,6 +95,23 @@ export function extractPoints(data) {
         if (mode?.value) add('state', {component: name, attribute: 'mode'}, {value: mode.value}, ts(mode));
     }
 
+    // target temperatures. SmartThings only models "cooling"/"heating" setpoints; which one the
+    // heating circuit actually uses depends on its mode, so keep both.
+    for (const [component, name] of [['main', 'warmwater'], ['INDOOR2', 'heating'], ['INDOOR1', 'indoor1']]) {
+        for (const [cap, attr, kind] of [['thermostatCoolingSetpoint', 'coolingSetpoint', 'cooling'], ['thermostatHeatingSetpoint', 'heatingSetpoint', 'heating']]) {
+            const a = c[component]?.[cap]?.[attr];
+            add('setpoint', {component: name, kind}, {value: num(a?.value)}, ts(a));
+        }
+    }
+    const outing = c.main?.['custom.outingMode']?.outingMode;
+    if (outing?.value) add('state', {component: 'heatpump', attribute: 'outingMode'}, {value: outing.value}, ts(outing));
+
+    // field service values (FSV): water-law and limit settings, useful when tuning the configuration
+    const fsv = c.main?.['samsungce.ehsFsvSettings']?.fsvSettings;
+    for (const s of fsv?.value || []) {
+        if (s?.inUse && s.isValid !== false) add('fsv', {id: String(s.id), type: String(s.type)}, {value: num(s.value)}, ts(fsv));
+    }
+
     // raw Samsung cycle data (5 min samples, hex blobs, format not yet decoded) - keep it verbatim
     const cycle = c.main?.['samsungce.ehsCycleData'] || {};
     for (const kind of ['outdoor', 'indoor']) {
@@ -97,25 +122,51 @@ export function extractPoints(data) {
     return points;
 }
 
-async function fetchStatus({url, token}) {
-    const res = await axios.get(url, {headers: {Authorization: token}, timeout: 20_000});
-    return res.data;
+export function resolveTokenFile(env = process.env) {
+    return env.ST_TOKEN_FILE || fileURLToPath(new URL('../data/smartthings-token.json', import.meta.url));
+}
+
+const bearer = (t) => (/^bearer /i.test(t) ? t : `Bearer ${t}`);
+
+export async function fetchStatus({url, auth}) {
+    const get = async (force) => axios.get(url, {
+        headers: {Authorization: bearer(await auth.getToken({force}))},
+        timeout: 20_000,
+    });
+    try {
+        return (await get(false)).data;
+    } catch (e) {
+        // access token rejected (expired early / revoked): refresh once and retry
+        if (e.response?.status === 401 && auth.oauth) return (await get(true)).data;
+        throw e;
+    }
 }
 
 // latest value per series, for the status page
 function summarize(points) {
-    const t = (m, tag, field) => {
-        const p = points.find((x) => x.measurement === m && Object.values(x.tags).includes(tag) && field in x.fields);
+    const t = (m, tags, field) => {
+        const p = points.find((x) => x.measurement === m && Object.entries(tags).every(([k, val]) => x.tags[k] === val) && field in x.fields);
         return p ? {value: p.fields[field], at: p.time} : undefined;
     };
     return {
-        heating: t('temperature', 'heating', 'temp'),
-        warmwater: t('temperature', 'warmwater', 'temp'),
-        power: t('powerconsumption', 'heatpump', 'power'),
-        energy: t('powerconsumption', 'heatpump', 'energy'),
-        mode: t('state', 'mode', 'value'),
+        heating: t('temperature', {component: 'heating'}, 'temp'),
+        warmwater: t('temperature', {component: 'warmwater'}, 'temp'),
+        power: t('powerconsumption', {component: 'heatpump'}, 'power'),
+        energy: t('powerconsumption', {component: 'heatpump'}, 'energy'),
+        heatingMode: t('state', {component: 'heating', attribute: 'mode'}, 'value'),
+        warmwaterMode: t('state', {component: 'warmwater', attribute: 'mode'}, 'value'),
+        heatingSetHeat: t('setpoint', {component: 'heating', kind: 'heating'}, 'value'),
+        heatingSetCool: t('setpoint', {component: 'heating', kind: 'cooling'}, 'value'),
+        warmwaterSet: t('setpoint', {component: 'warmwater', kind: 'cooling'}, 'value'),
         cycleSamples: points.filter((p) => p.measurement === 'ehs_cycle').length,
     };
+}
+
+function authLine(i) {
+    if (i.mode !== 'oauth') return 'auth: personal access token (may expire without notice)';
+    const days = i.refreshExpiresAt ? (i.refreshExpiresAt - Date.now()) / 86_400_000 : NaN;
+    const warn = days < 7 ? ' class=bad' : '';
+    return `auth: oauth · access token until ${i.accessExpiresAt?.toLocaleString() ?? '?'} · <span${warn}>refresh token valid ~${Math.floor(days)}d (renewed on every refresh)</span>`;
 }
 
 // tiny read-only status page: http://localhost:8787 (STATUS_PORT=0 disables, STATUS_HOST to expose)
@@ -137,8 +188,8 @@ function startStatusServer(config, status) {
 <style>body{font:15px system-ui;margin:2rem auto;max-width:34rem;padding:0 1rem}td{padding:.2rem .8rem .2rem 0}.ok{color:#2a7}.bad{color:#c33}pre{background:#f4f4f4;padding:.6rem;overflow:auto}</style>
 <h2>nano <span class=${stale || status.lastError ? 'bad' : 'ok'}>${stale ? 'STALE' : status.lastError ? 'ERROR' : 'running'}</span></h2>
 <p>last poll: ${ago(status.lastPollAt)} · polls ${status.polls} · failures ${status.failures} · every ${config.intervalMs / 1000}s<br>
-${status.lastError ? `<span class=bad>${esc(status.lastError)}</span><br>` : ''}uptime since ${status.startedAt.toLocaleString()}</p>
-<table>${row('Heizung', v.heating, ' °C')}${row('Warmwasser', v.warmwater, ' °C')}${row('Leistung', v.power, ' W')}${row('Energie', v.energy, ' kWh')}${row('Modus', v.mode)}
+${status.lastError ? `<span class=bad>${esc(status.lastError)}</span><br>` : ''}${authLine(config.smartthings.auth.info())}<br>uptime since ${status.startedAt.toLocaleString()}</p>
+<table>${row('Heizung', v.heating, ' °C')}${row('Warmwasser', v.warmwater, ' °C')}${row('Leistung', v.power, ' W')}${row('Energie', v.energy, ' kWh')}${row('Heizung Modus', v.heatingMode)}${row('Heizung Soll (heat)', v.heatingSetHeat, ' °C')}${row('Heizung Soll (cool)', v.heatingSetCool, ' °C')}${row('Warmwasser Modus', v.warmwaterMode)}${row('Warmwasser Soll', v.warmwaterSet, ' °C')}
 <tr><td>cycle samples</td><td>${v.cycleSamples ?? '–'}</td><td></td></tr></table>
 <h3>recent</h3><pre>${esc(status.events.join('\n'))}</pre>`);
     });

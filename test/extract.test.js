@@ -19,3 +19,14 @@ test('extracts temperature, power and cycle data with device timestamps', () => 
 test('missing capabilities yield no points instead of zeros', () => {
     assert.deepEqual(extractPoints({}), []);
 });
+
+test('heating circuit mode is separate from warm water mode; setpoints and FSV are captured', () => {
+    const pts = extractPoints(dump);
+    const mode = (component) => pts.find((p) => p.measurement === 'state' && p.tags.component === component && p.tags.attribute === 'mode')?.fields.value;
+    assert.equal(mode('warmwater'), 'eco');
+    assert.equal(mode('heating'), 'auto');
+    const sp = pts.find((p) => p.measurement === 'setpoint' && p.tags.component === 'heating' && p.tags.kind === 'cooling');
+    assert.equal(sp.fields.value, 24);
+    const fsv = pts.find((p) => p.measurement === 'fsv' && p.tags.id === '1031');
+    assert.equal(fsv.fields.value, 60);
+});
