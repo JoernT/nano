@@ -178,6 +178,12 @@ function startStatusServer(config, status) {
     const server = createServer((req, res) => {
         const v = status.values;
         const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(x.value) + unit : '–'}</td><td>${x?.at ? 'device: ' + ago(x.at) : ''}</td></tr>`;
+        if (req.url === '/api/status') {
+            // read-only copy of the last device status for the dashboard (src/index.html); no token needed
+            if (!status.latestRaw) { res.writeHead(503, {'access-control-allow-origin': '*'}); return res.end('no data yet'); }
+            res.writeHead(200, {'content-type': 'application/json', 'access-control-allow-origin': '*'});
+            return res.end(JSON.stringify(status.latestRaw));
+        }
         if (req.url === '/status.json') {
             res.writeHead(200, {'content-type': 'application/json'});
             return res.end(JSON.stringify(status));
@@ -207,6 +213,8 @@ export async function startPolling(config) {
     });
 
     const status = {startedAt: new Date(), polls: 0, failures: 0, lastPollAt: null, lastError: null, points: 0, values: {}, events: []};
+    // raw SmartThings response of the last successful poll, served at /api/status (not part of /status.json)
+    Object.defineProperty(status, 'latestRaw', {value: null, writable: true, enumerable: false});
     const note = (msg) => { status.events.unshift(`${new Date().toLocaleTimeString()}  ${msg}`); status.events.length = Math.min(status.events.length, 15); };
     const server = startStatusServer(config, status);
 
@@ -218,6 +226,7 @@ export async function startPolling(config) {
             const data = await fetchStatus(config.smartthings);
             const points = extractPoints(data);
             status.values = summarize(points);
+            status.latestRaw = data;
             for (const p of points) {
                 const pt = new Point(p.measurement);
                 for (const [k, val] of Object.entries(p.tags)) pt.tag(k, val);

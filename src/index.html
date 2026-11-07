@@ -10,7 +10,7 @@
     <link href="css/nano.css" rel="stylesheet"/>
     <script type="module">
         import './scripts/fore.js';
-        import ApexCharts from 'apexcharts';
+        import ApexCharts from '../node_modules/apexcharts/dist/apexcharts.esm.js';
     </script>
 
 </head>
@@ -30,22 +30,23 @@
                 </data>
             </fx-instance>
             <fx-instance id="response" type="json">{}</fx-instance>
-            <fx-instance id="vars">
-                <data>
-                    <device-id>5574bfcf-b397-8a39-88d3-000001200000</device-id>
-                    <token>be2d2c9e-34d2-4553-96f1-bc7e85881e3b</token>
-                    <locationid>1ed2a3d7-df09-4509-801e-9e0d9abad03c</locationid>
-                </data>
-            </fx-instance>
+            <!-- served by the poller (src/nano.js, STATUS_PORT, default 8787); no token in the browser -->
             <fx-submission id="s-load-current"
-                           url="https://api.smartthings.com/v1/devices/{instance('vars')/device-id}/status"
+                           url="http://localhost:8787/api/status"
                            method="get"
                            replace="instance"
                            instance="response">
-                <fx-header name="Authorization" value="'Bearer ' || instance('vars')/token"></fx-header>
                 <fx-message event="submit-done">aktualisiert</fx-message>
             </fx-submission>
-<!--            https://api.smartthings.com/v1/devices/5574bfcf-b397-8a39-88d3-000001200000/health?locationId=1ed2a3d7-df09-4509-801e-9e0d9abad03c-->
+
+            <fx-submission id="s-influx"
+                           url="http://nano.local:8086/query"
+                           method="get"
+                           response-mediatype="text/csv"
+                           replace="instance"
+                           instance="influx">
+
+            </fx-submission>
         </fx-model>
         <section class="current">
             <section>
@@ -66,14 +67,14 @@
                 <header>Energie</header>
                 <div class="measurement">
                     <img class="icon" src="images/supply.png">
-                    <span>{instance('response')?components?main?powerConsumptionReport?powerConsumption?value?power}</span>
-                    <span class="unit"> kWh</span></div>
+                    <span>{round(instance('response')?components?main?powerConsumptionReport?powerConsumption?value?power,2)}</span>
+                    <span class="unit"> W</span></div>
             </section>
-            <fx-trigger>
-                <img class="icon action reload" src="images/refresh.png">
-                <fx-send submission="s-load-current"></fx-send>
-            </fx-trigger>
         </section>
+        <fx-trigger class="reload">
+            <img class="icon action" src="images/refresh.png">
+            <fx-send submission="s-load-current"></fx-send>
+        </fx-trigger>
 
     </fx-fore>
 </div>
