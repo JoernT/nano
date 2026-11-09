@@ -30,3 +30,12 @@ test('heating circuit mode is separate from warm water mode; setpoints and FSV a
     const fsv = pts.find((p) => p.measurement === 'fsv' && p.tags.id === '1031');
     assert.equal(fsv.fields.value, 60);
 });
+
+test('firmware and driver versions are stored as state strings', () => {
+    const pts = extractPoints(dump);
+    const st = (attribute) => pts.find((p) => p.measurement === 'state' && p.tags.component === 'heatpump' && p.tags.attribute === attribute);
+    assert.equal(st('firmware').fields.value, '20230914.1');
+    assert.equal(st('firmware').time.toISOString(), '2023-11-29T17:15:10.462Z');
+    assert.equal(st('driver').fields.value, '23070101');
+    assert.equal(st('micom'), undefined); // null in the fixture -> not written
+});

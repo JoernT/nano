@@ -12,6 +12,11 @@ now 28 and 31 bytes. The offsets below are for the current layout and have not b
 Confidence: **confirmed** = checked against an independent signal, **likely** = fits the data in
 at least two cases, **unknown** = varies but is not understood.
 
+Firmware seen so far (device attribute `ocf.mnfv`): `20230914.1` in the 2024 dump (blobs 18/24 bytes),
+`20260320.1` since at least 2026-11-07 (blobs 28/31 bytes). The poller stores the current value as
+measurement `state`, tags `component=heatpump, attribute=firmware` (also `driver`, `micom`, `updateAvailable`),
+so a layout change can be matched to a firmware change in the history.
+
 ## outdoor blob (28 bytes)
 
 | byte | meaning | confidence |

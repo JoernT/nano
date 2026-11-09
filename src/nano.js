@@ -103,6 +103,20 @@ export function extractPoints(data) {
             add('setpoint', {component: name, kind}, {value: num(a?.value)}, ts(a));
         }
     }
+    // firmware / software versions: the ehsCycleData blob layout changes with the firmware,
+    // so keep them next to the raw data (see docs/ehsCycleData.md)
+    for (const [attribute, a] of [
+        ['firmware', c.main?.ocf?.mnfv],
+        ['driver', c.main?.['samsungce.driverVersion']?.versionNumber],
+        ['micom', c.main?.['samsungce.deviceIdentification']?.micomAssayCode],
+    ]) {
+        if (a?.value !== undefined && a?.value !== null && a.value !== '') {
+            add('state', {component: 'heatpump', attribute}, {value: String(a.value)}, ts(a));
+        }
+    }
+    const update = c.main?.['samsungce.softwareUpdate']?.newVersionAvailable;
+    if (typeof update?.value === 'boolean') add('state', {component: 'heatpump', attribute: 'updateAvailable'}, {value: String(update.value)}, ts(update));
+
     const outing = c.main?.['custom.outingMode']?.outingMode;
     if (outing?.value) add('state', {component: 'heatpump', attribute: 'outingMode'}, {value: outing.value}, ts(outing));
 
