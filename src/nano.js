@@ -84,6 +84,9 @@ export function extractPoints(data) {
             deltaEnergy: num(v.deltaEnergy),
             powerEnergy: num(v.powerEnergy),
             energySaved: num(v.energySaved),
+            persistedEnergy: num(v.persistedEnergy) !== undefined ? v.persistedEnergy / 1000 : undefined,
+            // report window: exact basis for per-window kWh / COP
+            windowSeconds: v.start && v.end ? (new Date(v.end) - new Date(v.start)) / 1000 : undefined,
         }, ts(pc));
     }
 
@@ -120,10 +123,32 @@ export function extractPoints(data) {
     const outing = c.main?.['custom.outingMode']?.outingMode;
     if (outing?.value) add('state', {component: 'heatpump', attribute: 'outingMode'}, {value: outing.value}, ts(outing));
 
+    // live operating states (diagnostics): booster heater, diverter valve (room/tank), defrost, thermostat link
+    for (const [component, name] of [['main', 'warmwater'], ['INDOOR2', 'heating'], ['INDOOR1', 'indoor1']]) {
+        const comp = c[component] || {};
+        for (const [attribute, a] of [
+            ['boosterHeater', comp['samsungce.ehsBoosterHeater']?.status],
+            ['diverterValve', comp['samsungce.ehsDiverterValve']?.position],
+            ['defrost', comp['samsungce.ehsDefrostMode']?.status],
+            ['thermostatConnection', comp['samsungce.ehsThermostat']?.connectionState],
+            ['temperatureReference', comp['samsungce.ehsTemperatureReference']?.temperatureReference],
+        ]) {
+            if (a?.value) add('state', {component: name, attribute}, {value: String(a.value)}, ts(a));
+        }
+        // allowed setpoint range
+        const sc = comp['custom.thermostatSetpointControl'];
+        add('setpoint', {component: name, kind: 'limit'}, {min: num(sc?.minimumSetpoint?.value), max: num(sc?.maximumSetpoint?.value)}, ts(sc?.minimumSetpoint));
+    }
+    // indoor/outdoor board module versions
+    const sw = c.main?.['samsungce.softwareVersion']?.versions;
+    for (const m of sw?.value || []) {
+        if (m?.versionNumber) add('state', {component: 'heatpump', attribute: `module${m.id}`}, {value: String(m.versionNumber)}, ts(sw));
+    }
+
     // field service values (FSV): water-law and limit settings, useful when tuning the configuration
     const fsv = c.main?.['samsungce.ehsFsvSettings']?.fsvSettings;
     for (const s of fsv?.value || []) {
-        if (s?.inUse && s.isValid !== false) add('fsv', {id: String(s.id), type: String(s.type)}, {value: num(s.value)}, ts(fsv));
+        if (s?.inUse && s.isValid !== false) add('fsv', {id: String(s.id), type: String(s.type)}, {value: num(s.value), min: num(s.minValue), max: num(s.maxValue)}, ts(fsv));
     }
 
     // raw Samsung cycle data (5 min samples, hex blobs, format not yet decoded) - keep it verbatim

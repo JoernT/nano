@@ -39,3 +39,23 @@ test('firmware and driver versions are stored as state strings', () => {
     assert.equal(st('driver').fields.value, '23070101');
     assert.equal(st('micom'), undefined); // null in the fixture -> not written
 });
+
+test('operating states, setpoint limits, report window and module versions are captured', () => {
+    const pts = extractPoints({components: {
+        main: {
+            'samsungce.ehsBoosterHeater': {status: {value: 'off'}},
+            'samsungce.ehsDiverterValve': {position: {value: 'room'}},
+            'custom.thermostatSetpointControl': {minimumSetpoint: {value: 40}, maximumSetpoint: {value: 60}},
+            powerConsumptionReport: {powerConsumption: {value: {power: 1, energy: 2000, persistedEnergy: 2000, start: '2026-11-09T11:10:14Z', end: '2026-11-09T11:30:14Z'}}},
+            'samsungce.softwareVersion': {versions: {value: [{id: '3', versionNumber: 'DB91-02450A'}]}},
+        },
+        INDOOR2: {'samsungce.ehsDefrostMode': {status: {value: 'off'}}},
+    }});
+    const st = (component, attribute) => pts.find((p) => p.measurement === 'state' && p.tags.component === component && p.tags.attribute === attribute)?.fields.value;
+    assert.equal(st('warmwater', 'boosterHeater'), 'off');
+    assert.equal(st('warmwater', 'diverterValve'), 'room');
+    assert.equal(st('heating', 'defrost'), 'off');
+    assert.equal(st('heatpump', 'module3'), 'DB91-02450A');
+    assert.deepEqual(pts.find((p) => p.tags.kind === 'limit').fields, {min: 40, max: 60});
+    assert.equal(pts.find((p) => p.measurement === 'powerconsumption').fields.windowSeconds, 1200);
+});
