@@ -71,7 +71,24 @@
                     <span class="unit"> W</span></div>
             </section>
         </section>
+        <details class="info">
+            <summary>Info</summary>
+            <table>
+                <tr><th>Modell</th><td>{instance('response')?components?main?ocf?n?value}</td></tr>
+                <tr><th>Typ</th><td>{instance('response')?components?main?('samsungce.deviceIdentification')?binaryId?value}</td></tr>
+                <tr><th>Hersteller</th><td>{instance('response')?components?main?ocf?mnmn?value}</td></tr>
+                <tr><th>Firmware</th><td>{instance('response')?components?main?ocf?mnfv?value}</td></tr>
+                <tr><th>Treiber</th><td>{instance('response')?components?main?('samsungce.driverVersion')?versionNumber?value}</td></tr>
+                <tr><th>Micom</th><td>{instance('response')?components?main?('samsungce.deviceIdentification')?micomAssayCode?value}</td></tr>
+                <tr><th>Software</th><td>{instance('response')?components?main?('samsungce.softwareVersion')?versions?value?1?versionNumber}</td></tr>
+                <tr><th>Innenmodul</th><td>{instance('response')?components?main?('samsungce.softwareVersion')?versions?value?2?versionNumber}</td></tr>
+                <tr><th>Außenmodul</th><td>{instance('response')?components?main?('samsungce.softwareVersion')?versions?value?3?versionNumber}</td></tr>
+                <tr><th>Außenmodul LT</th><td>{instance('response')?components?main?('samsungce.softwareVersion')?versions?value?4?versionNumber}</td></tr>
+                <tr><th>Update</th><td>{if(instance('response')?components?main?('samsungce.softwareUpdate')?newVersionAvailable?value) then 'verfügbar' else 'aktuell'}</td></tr>
+            </table>
+        </details>
         <section class="states">
+            <div class="chip" data-state="{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}"><span class="label">Modus</span><span class="value">{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}"><span class="label">Ventil</span><span class="value">{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsBoosterHeater')?status?value}"><span class="label">Heizstab</span><span class="value">{instance('response')?components?main?('samsungce.ehsBoosterHeater')?status?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}"><span class="label">Abtauen</span><span class="value">{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}</span></div>
