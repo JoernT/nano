@@ -4,3 +4,4 @@ dump.json
 .env
 data/
 dist/
+.venv/
