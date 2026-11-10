@@ -1,0 +1,18 @@
+:root { --fg: #1b1b1b; --muted: #777; --bg: #fff; --panel: #f6f7f8; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --muted: #999; --bg: #15171a; --panel: #1e2125; } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 1rem 3rem; font-family: system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 72rem; margin-inline: auto; }
+.bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; padding: 1rem 0; }
+.bar h1 { font-size: 1.3rem; font-weight: 300; margin: 0; flex: 1; }
+.bar a { color: var(--muted); text-decoration: none; }
+nav button { border: 1px solid var(--muted); background: none; color: var(--fg); padding: .3rem .8rem; border-radius: 1rem; cursor: pointer; }
+nav button.active { background: var(--fg); color: var(--bg); }
+.msg { color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.tile { background: var(--panel); border-radius: .8rem; padding: .8rem 1rem; }
+.tile b { display: block; font-size: 1.6rem; font-weight: 300; }
+.tile span { color: var(--muted); font-size: .85rem; }
+.panel { background: var(--panel); border-radius: .8rem; padding: .8rem 1rem; margin-bottom: 1rem; }
+.panel h2 { font-size: 1rem; font-weight: 400; margin: 0 0 .5rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: .5rem 0 0; font-size: .85rem; color: var(--muted); }
+.legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .35rem; vertical-align: -1px; }

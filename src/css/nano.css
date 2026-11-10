@@ -174,3 +174,14 @@ details.info th {
     opacity: .7;
     padding: .15rem 1rem .15rem 0;
 }
+
+a.report-link {
+    position: fixed;
+    right: 7rem;
+    top: 4.2rem;
+    font-size: .9rem;
+    color: inherit;
+    text-decoration: none;
+    opacity: .7;
+}
+a.report-link:hover { opacity: 1; }

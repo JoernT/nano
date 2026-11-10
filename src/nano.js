@@ -14,6 +14,7 @@ import axios from 'axios';
 import {InfluxDB, Point} from '@influxdata/influxdb-client';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
+import {createHistory, RANGES} from './history.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -214,6 +215,7 @@ function startStatusServer(config, status) {
     if (!port) return null;
     const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
     const ago = (d) => (d ? `${Math.round((Date.now() - d) / 1000)}s ago` : 'never');
+    const history = createHistory(config);
     const server = createServer((req, res) => {
         const v = status.values;
         const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(x.value) + unit : '–'}</td><td>${x?.at ? 'device: ' + ago(x.at) : ''}</td></tr>`;
@@ -232,6 +234,16 @@ function startStatusServer(config, status) {
             if (!status.latestRaw) { res.writeHead(503, {'access-control-allow-origin': '*'}); return res.end('no data yet'); }
             res.writeHead(200, {'content-type': 'application/json', 'access-control-allow-origin': '*'});
             return res.end(JSON.stringify(status.latestRaw));
+        }
+        if (req.url?.startsWith('/api/history')) {
+            // read-only history for the report page (src/report.html), served from InfluxDB
+            const range = new URL(req.url, 'http://x').searchParams.get('range') || '7d';
+            const headers = {'content-type': 'application/json', 'access-control-allow-origin': '*'};
+            if (!RANGES[range]) { res.writeHead(400, headers); return res.end(JSON.stringify({error: `range must be one of ${Object.keys(RANGES).join(', ')}`})); }
+            history(range)
+                .then((h) => { res.writeHead(200, headers); res.end(JSON.stringify(h)); })
+                .catch((e) => { log('history:', e.message); res.writeHead(500, headers); res.end(JSON.stringify({error: e.message})); });
+            return;
         }
         if (req.url === '/status.json') {
             res.writeHead(200, {'content-type': 'application/json'});

@@ -90,9 +90,9 @@
         <section class="states">
             <div class="chip" data-state="{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}"><span class="label">Modus</span><span class="value">{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}"><span class="label">Ventil</span><span class="value">{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}</span></div>
-            <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsBoosterHeater')?status?value}"><span class="label">Heizstab</span><span class="value">{instance('response')?components?main?('samsungce.ehsBoosterHeater')?status?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}"><span class="label">Abtauen</span><span class="value">{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}</span></div>
         </section>
+        <a class="report-link" href="report.html">Report →</a>
         <fx-trigger class="reload">
             <img class="icon action" src="images/refresh.png">
             <fx-send submission="s-load-current"></fx-send>

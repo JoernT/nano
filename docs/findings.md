@@ -45,9 +45,16 @@
 - Device id = first 6 bytes of the manufacturer data (macOS hides MAC addresses). Room names are in `src/rooms.json`: `dad05fa0b998` = bedroom1, `d22e81467466` = livingroom. `e55c0c0ec454` = bedroom2 (upstairs). Still unnamed: `de6910125107` (17.5 °C / 41 %).
 - Runs on the Mac, so data has gaps while it sleeps.
 
+## Report page and cycle data (2026-11-10)
+- `src/report.html` (open `/report.html` on the dev server) shows room temperatures with the 22.5 °C line, flow and hot-water temperature, power with compressor Hz, starts and energy per day, and a state timeline. Ranges: 24 h, 7 days, 30 days. Data comes from `/api/history?range=` on the poller (`src/history.js`), which queries Influx; cycle detection is in `src/cycles.js` (tested).
+- Cycles are detected from the compressor frequency (outdoor blob byte 3, 5-minute samples), not from power: the power report is averaged over about 20 minutes and is too coarse. Byte 3 reads 0, 20 or 25 Hz in the 2026 data and up to about 70 Hz during hot-water charging, which fits a real frequency, but it has only been cross-checked against power roughly.
+- First numbers (7 days to 2026-11-10): 86 compressor starts, 4 short cycles (under 10 min), average run 39 min, median 30 min, about 25 kWh/day (11-08: 35 starts, 24.9 kWh; 11-09: 26 starts, 24 kWh).
+- The unit mostly runs at its minimum of 20 Hz at about 1 kW, so it modulates at the lower limit and cycles (about 26 starts per day on a full day). Combined with the rooms above 22.5 °C this points to a too-high curve for the current load.
+- No outdoor temperature is stored in Influx, so the report has no outdoor line yet.
+
 ## Open questions
 1. **Which blob bytes are temperatures, and what are they?** Outdoor bytes 6–8 and indoor bytes 0, 2, 3 look like temperatures (flow, return, discharge or defrost sensors). Outdoor bytes 10–11 (about 0–2000, falling while running) could be a defrost or anti-short-cycle timer. Indoor byte 8 (0–100) could be a pump or valve percentage. The rest are not understood. Needs experiments on the real unit: change a setpoint or mode and see which bytes move.
-2. **Do defrost, booster heater and diverter valve ever change?** Everything has been idle so far, so the series have no `on` or `tank` values yet.
+2. **Do defrost and the diverter valve ever change?** Defrost has been idle so far. (The booster heater is only a backup for extremes and has never been used, so it was removed from the dashboard and report on 2026-11-10; the poller still records it.)
 3. **How do the 2026 blob layouts map against the 2024 ones?** Decoding was built on the older layouts, so the byte mapping may have shifted.
 4. **How do we get COP?** The power report gives exact kWh per window, but there is no heat meter, so no heat output. Is an external meter or a flow/return estimate from the blobs an option?
 5. **Why is `thermostatConnection` `disconnected`?** Assumed to be the room-thermostat link, not confirmed. Does it matter, given control runs on water temperature?

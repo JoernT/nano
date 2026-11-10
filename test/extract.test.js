@@ -59,3 +59,31 @@ test('operating states, setpoint limits, report window and module versions are c
     assert.deepEqual(pts.find((p) => p.tags.kind === 'limit').fields, {min: 40, max: 60});
     assert.equal(pts.find((p) => p.measurement === 'powerconsumption').fields.windowSeconds, 1200);
 });
+
+import {compressorHz, detectCycles, dailyStats, summary} from '../src/cycles.js';
+
+test('cycle detection: runs, gaps and short cycles', () => {
+    const m = 60_000;
+    const t0 = Date.UTC(2026, 10, 9, 10, 0);
+    // 0 0 | 20 20 20 | 0 | 25 | gap | 20 20
+    const samples = [
+        [0, 0], [5, 0], [10, 20], [15, 20], [20, 20], [25, 0], [30, 25], [90, 20], [95, 20],
+    ].map(([min, hz]) => ({t: t0 + min * m, hz}));
+    const runs = detectCycles(samples);
+    assert.equal(runs.length, 3);
+    assert.equal(runs[0].durationMs, 15 * m);
+    assert.equal(runs[0].avgHz, 20);
+    assert.equal(runs[0].short, false);
+    assert.equal(runs[1].durationMs, 5 * m);
+    assert.equal(runs[1].short, true);
+    assert.equal(runs[2].start, t0 + 90 * m);
+    const s = summary(runs);
+    assert.equal(s.starts, 3);
+    assert.equal(s.shortCycles, 1);
+    assert.deepEqual(dailyStats(runs).map((d) => [d.starts, d.shortCycles]), [[3, 1]]);
+});
+
+test('compressorHz reads byte 3 of the outdoor blob', () => {
+    assert.equal(compressorHz('0014001900'), 25);
+    assert.equal(compressorHz('00'), undefined);
+});
