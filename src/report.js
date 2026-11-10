@@ -28,7 +28,7 @@ function draw(id, options) {
 }
 
 const fmt = (n, d = 1) => (n === undefined || n === null ? '–' : Number(n).toFixed(d));
-const ROOM_LABEL = {bedroom1: 'Schlafzimmer 1', bedroom2: 'Schlafzimmer 2', livingroom: 'Wohnzimmer'};
+const ROOM_LABEL = {bedroom1: 'Schlafzimmer 1', bedroom2: '1.Stck', livingroom: 'Wohnzimmer'};
 
 function renderTiles(h) {
     const s = h.summary;
