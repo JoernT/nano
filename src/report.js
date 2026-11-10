@@ -4,6 +4,7 @@ import ApexCharts from 'apexcharts';
 const API = `${location.protocol}//${location.hostname}:8787/api/history`;
 const GROUP = 'nano'; // same group = synchronised zoom and tooltip
 const charts = {};
+let view = {}; // selected time window, so every time chart spans it even where there is no data
 const COLORS = ['#e4572e', '#2e86ab', '#76b041', '#a23b72', '#f2a541', '#6c757d'];
 const STATE_LABELS = {mode: 'Heizmodus', diverterValve: 'Ventil', defrost: 'Abtauen'};
 const STATE_COLORS = {auto: '#2e86ab', heat: '#e4572e', cool: '#76b041', room: '#6c757d', tank: '#f2a541', on: '#e4572e', off: '#d6d9dc'};
@@ -15,7 +16,7 @@ const base = (extra) => ({
     dataLabels: {enabled: false},
     colors: COLORS,
     grid: {borderColor: dark ? '#333' : '#e3e5e8'},
-    xaxis: {type: 'datetime', labels: {datetimeUTC: false}},
+    xaxis: {type: 'datetime', labels: {datetimeUTC: false}, min: view.min, max: view.max},
     tooltip: {x: {format: 'dd.MM. HH:mm'}},
     legend: {position: 'top'},
     ...extra.rest,
@@ -122,6 +123,13 @@ async function load(range) {
         msg.textContent = `Fehler beim Laden: ${e.message} (läuft der Poller auf Port 8787?)`;
         return;
     }
+    view = {min: h.from, max: h.to};
+    const firsts = [h.hz, h.power, ...Object.values(h.rooms), ...Object.values(h.temps)].map((pts) => pts?.[0]?.[0]).filter((t) => t !== undefined);
+    const first = firsts.length ? Math.min(...firsts) : null;
+    const f = (t) => new Date(t).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+    const gap = first && first - h.from > 3600_000;
+    document.getElementById('range-info').innerHTML = `Zeitraum ${f(h.from)} – ${f(h.to)}`
+        + (!first ? ' · <b class="warn">keine Daten</b>' : gap ? ` · <b class="warn">Daten erst ab ${f(first)}</b> (davor leer)` : '');
     msg.textContent = `Stand ${new Date(h.to).toLocaleString('de-DE')}`;
     renderTiles(h);
 

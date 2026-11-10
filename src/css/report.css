@@ -8,6 +8,8 @@ body { margin: 0; padding: 0 1rem 3rem; font-family: system-ui, sans-serif; colo
 nav button { border: 1px solid var(--muted); background: none; color: var(--fg); padding: .3rem .8rem; border-radius: 1rem; cursor: pointer; }
 nav button.active { background: var(--fg); color: var(--bg); }
 .msg { color: var(--muted); }
+.range-info { margin-top: -.5rem; }
+.range-info .warn { color: #e4572e; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .8rem; margin-bottom: 1rem; }
 .tile { background: var(--panel); border-radius: .8rem; padding: .8rem 1rem; }
 .tile b { display: block; font-size: 1.6rem; font-weight: 300; }
