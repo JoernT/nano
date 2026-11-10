@@ -68,6 +68,48 @@ function renderStates(h) {
     });
 }
 
+// y-range for the heating curve: a few degrees around the data instead of starting at 0
+function flowBounds(curve = []) {
+    if (!curve.length) return {};
+    const ys = curve.map((p) => p[1]);
+    return {min: Math.floor(Math.min(...ys)) - 2, max: Math.ceil(Math.max(...ys)) + 2};
+}
+
+// union of all room timestamps (server windows are aligned); the shared tooltip matches series by index,
+// so every series is put on this grid with null where a sensor has no value
+const roomGrid = (rooms) => [...new Set(Object.values(rooms).flatMap((pts) => pts.map((p) => p[0])))].sort((a, b) => a - b);
+const onGrid = (pts, grid, maxGapMs = 15 * 60_000) => {
+    const m = new Map(pts);
+    let last = null;
+    return grid.map((t) => {
+        if (m.has(t)) last = [t, m.get(t)];
+        // hold the previous value over short gaps so the line stays connected, longer gaps stay empty
+        return [t, m.has(t) ? m.get(t) : last && t - last[0] <= maxGapMs ? last[1] : null];
+    });
+};
+
+// outdoor values are hourly, rooms every few minutes: resample onto the room timestamps (linear, last value held)
+// so the shared tooltip finds an outdoor value at every x position
+function resample(series = [], grid = []) {
+    if (!series.length) return [];
+    let i = 0;
+    return grid.map((t) => {
+        while (i + 1 < series.length && series[i + 1][0] <= t) i++;
+        const [t0, v0] = series[i];
+        const next = series[i + 1];
+        if (t <= t0 || !next) return [t, v0];
+        return [t, Math.round((v0 + ((next[1] - v0) * (t - t0)) / (next[0] - t0)) * 10) / 10];
+    });
+}
+
+// ApexCharts' shared tooltip showed only the nearest series here, so list all series at the hovered point ourselves
+function allSeriesTooltip({series, dataPointIndex, w}) {
+    const t = w.globals.seriesX[0]?.[dataPointIndex];
+    const rows = series.map((s, i) => [w.globals.seriesNames[i], s[dataPointIndex], w.globals.colors[i]]).filter(([, v]) => v !== null && v !== undefined);
+    return `<div style="padding:.4rem .6rem"><b>${t ? new Date(t).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : ''}</b>`
+        + rows.map(([n, v, c]) => `<div><i style="display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:${c};margin-right:.4rem"></i>${n}: <b>${Number(v).toFixed(1)} °C</b></div>`).join('') + '</div>';
+}
+
 async function load(range) {
     const msg = document.getElementById('msg');
     msg.textContent = 'lade …';
@@ -85,9 +127,13 @@ async function load(range) {
 
     draw('c-rooms', {
         ...base({chart: {type: 'line'}, rest: {}}),
-        series: [...Object.entries(h.rooms).map(([name, data]) => ({name: ROOM_LABEL[name] || name, data})), {name: 'Außen (DWD)', data: h.outdoor || []}],
+        series: (() => {
+            const grid = roomGrid(h.rooms);
+            return [...Object.entries(h.rooms).map(([name, data]) => ({name: ROOM_LABEL[name] || name, data: onGrid(data, grid)})), {name: 'Außen (DWD)', data: resample(h.outdoor, grid)}];
+        })(),
         stroke: {width: [...Object.keys(h.rooms).map(() => 2), 2], curve: 'smooth', dashArray: [...Object.keys(h.rooms).map(() => 0), 5]},
         yaxis: {decimalsInFloat: 1, title: {text: '°C'}},
+        tooltip: {custom: allSeriesTooltip},
         annotations: {yaxis: [{y: 22.5, borderColor: '#e4572e', strokeDashArray: 4, label: {text: '22,5 °C', style: {color: '#fff', background: '#e4572e'}}}]},
     });
     draw('c-flow', {
@@ -107,8 +153,8 @@ async function load(range) {
     draw('c-curve', {
         ...base({chart: {type: 'scatter', group: undefined, zoom: {type: 'xy'}}, rest: {}}),
         series: [{name: 'Stundenmittel', data: h.curve || []}],
-        xaxis: {type: 'numeric', title: {text: 'Außentemperatur °C'}, decimalsInFloat: 0, tickAmount: 10},
-        yaxis: {decimalsInFloat: 0, title: {text: 'Vorlauf °C'}},
+        xaxis: {type: 'numeric', title: {text: 'Außentemperatur °C'}, decimalsInFloat: 1, tickAmount: 8},
+        yaxis: {decimalsInFloat: 0, ...flowBounds(h.curve), title: {text: 'Vorlauf °C'}},
         markers: {size: 4},
         tooltip: {x: {formatter: (v) => `${v} °C außen`}},
     });
