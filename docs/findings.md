@@ -53,6 +53,12 @@
 - Outdoor temperature (2026-11-10): the poller now writes hourly `weather` points (tag `source=open-meteo`, fields `temp`, `humidity`; DWD ICON model for 52.44N/13.30E, no API key) and backfills 30 days on start. wetter.com has no free API, so it is not used. The report shows the outdoor line in the room chart, a heating-curve scatter (hourly flow vs outdoor) and Pearson r values.
 - First correlations (7 days, outdoor only 2-3.5 °C daily mean): flow vs outdoor r = 0.27, kWh/day vs outdoor r = -0.08. Too little outdoor spread yet to say anything; recheck when it gets colder or over 30 days.
 
+## Experiments and degree days (2026-11-10)
+- Changes made on the unit are logged in `src/experiments.json` as `[{"at": "2026-11-10T15:56:00+01:00", "label": "Heizkurve -4,0 (-0,5 K)"}]`. The report draws them as green vertical markers and splits the days into phases.
+- The phase table (7 or 30 day view) compares full days only: kWh per degree day (Gradtag 20/15, outdoor from DWD), kWh/day, starts/day, short cycles/day and mean room temperature (named sensors). Days containing a change, the running day and days before the data starts are left out.
+- Heating curve history: before 2026-11-10 15:56 the user had already lowered the curve in earlier steps (not logged, so they sit in the first phase); at 15:56 it went from -3.5 to -4.0 (offset on the unit; exact FSV unknown).
+- First defrost seen at about 14:20 on 2026-11-10 (visible in the state timeline).
+
 ## Open questions
 1. **Which blob bytes are temperatures, and what are they?** Outdoor bytes 6–8 and indoor bytes 0, 2, 3 look like temperatures (flow, return, discharge or defrost sensors). Outdoor bytes 10–11 (about 0–2000, falling while running) could be a defrost or anti-short-cycle timer. Indoor byte 8 (0–100) could be a pump or valve percentage. The rest are not understood. Needs experiments on the real unit: change a setpoint or mode and see which bytes move.
 2. **Do defrost and the diverter valve ever change?** Defrost has been idle so far. (The booster heater is only a backup for extremes and has never been used, so it was removed from the dashboard and report on 2026-11-10; the poller still records it.)

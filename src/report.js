@@ -4,7 +4,8 @@ import ApexCharts from 'apexcharts';
 const API = `${location.protocol}//${location.hostname}:8787/api/history`;
 const GROUP = 'nano'; // same group = synchronised zoom and tooltip
 const charts = {};
-let view = {}; // selected time window, so every time chart spans it even where there is no data
+let view = {}; // selected window and experiments
+const expAnnotations = () => (view.experiments || []).filter((e) => e.at >= view.min).map((e) => ({x: e.at, borderColor: '#76b041', strokeDashArray: 3, label: {text: e.label, orientation: 'horizontal', textAnchor: 'end', position: 'top', offsetX: -4, style: {color: '#fff', background: '#76b041'}}})); // selected time window, so every time chart spans it even where there is no data
 const COLORS = ['#e4572e', '#2e86ab', '#76b041', '#a23b72', '#f2a541', '#6c757d'];
 const STATE_LABELS = {mode: 'Heizmodus', diverterValve: 'Ventil', defrost: 'Abtauen'};
 const STATE_COLORS = {auto: '#2e86ab', heat: '#e4572e', cool: '#76b041', room: '#6c757d', tank: '#f2a541', on: '#e4572e', off: '#d6d9dc'};
@@ -16,6 +17,7 @@ const base = (extra) => ({
     dataLabels: {enabled: false},
     colors: COLORS,
     grid: {borderColor: dark ? '#333' : '#e3e5e8'},
+    annotations: {xaxis: expAnnotations()},
     xaxis: {type: 'datetime', labels: {datetimeUTC: false}, min: view.min, max: view.max},
     tooltip: {x: {format: 'dd.MM. HH:mm'}},
     legend: {position: 'top'},
@@ -42,6 +44,31 @@ function renderTiles(h) {
         [kwh.length ? fmt(kwh.reduce((a, b) => a + b, 0) / kwh.length) + ' kWh' : '–', 'Ø Energie pro Tag'],
     ];
     document.getElementById('summary').innerHTML = tiles.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+
+function renderHdd(h) {
+    const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Berlin'});
+    const rows = h.daily.filter((d) => d.day !== today);
+    draw('c-hdd', {
+        ...base({chart: {type: 'line', group: undefined, height: 240}, rest: {}}),
+        series: [
+            {name: 'kWh je Gradtag', type: 'column', data: rows.map((d) => (d.kwh !== undefined && d.hdd >= 1 ? Math.round((d.kwh / d.hdd) * 100) / 100 : null))},
+            {name: 'Starts pro Tag', type: 'line', data: rows.map((d) => d.starts)},
+        ],
+        xaxis: {categories: rows.map((d) => d.day)},
+        annotations: {},
+        stroke: {width: [0, 3]},
+        yaxis: [{title: {text: 'kWh/Gradtag'}, decimalsInFloat: 2}, {opposite: true, title: {text: 'Starts'}, decimalsInFloat: 0}],
+        tooltip: {shared: true},
+    });
+}
+
+function renderPhases(h) {
+    const f = (v, d = 1) => (v === undefined ? '–' : Number(v).toFixed(d));
+    const rows = h.phases.map((p) => `<tr><td>${p.label}${p.from ? ` <small>ab ${new Date(p.from).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</small>` : ''}</td><td>${p.days}</td><td>${f(p.kwhPerHdd, 2)}</td><td>${f(p.kwh)}</td><td>${f(p.starts, 0)}</td><td>${f(p.shortCycles)}</td><td>${f(p.roomMean)}</td></tr>`).join('');
+    document.getElementById('phases').innerHTML = `<table class="phases"><thead><tr><th>Phase</th><th>volle Tage</th><th>kWh/Gradtag</th><th>kWh/Tag</th><th>Starts/Tag</th><th>Kurzläufe/Tag</th><th>Ø Raum °C</th></tr></thead><tbody>${rows}</tbody></table>`
+        + (h.phases.every((p) => !p.days) ? '<p class="msg">Keine vollen Tage im gewählten Zeitraum: 7 oder 30 Tage wählen.</p>' : '')
+        + (h.experiments.length ? '' : '<p class="msg">Noch keine Änderung eingetragen: Eintrag in src/experiments.json, z. B. {"at": "2026-11-11T14:00:00+01:00", "label": "Kurve -2 K"}</p>');
 }
 
 function renderStates(h) {
@@ -123,7 +150,7 @@ async function load(range) {
         msg.textContent = `Fehler beim Laden: ${e.message} (läuft der Poller auf Port 8787?)`;
         return;
     }
-    view = {min: h.from, max: h.to};
+    view = {min: h.from, max: h.to, experiments: h.experiments};
     const firsts = [h.hz, h.power, ...Object.values(h.rooms), ...Object.values(h.temps)].map((pts) => pts?.[0]?.[0]).filter((t) => t !== undefined);
     const first = firsts.length ? Math.min(...firsts) : null;
     const f = (t) => new Date(t).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
@@ -142,7 +169,7 @@ async function load(range) {
         stroke: {width: [...Object.keys(h.rooms).map(() => 2), 2], curve: 'smooth', dashArray: [...Object.keys(h.rooms).map(() => 0), 5]},
         yaxis: {decimalsInFloat: 1, title: {text: '°C'}},
         tooltip: {custom: allSeriesTooltip},
-        annotations: {yaxis: [{y: 22.5, borderColor: '#e4572e', strokeDashArray: 4, label: {text: '22,5 °C', style: {color: '#fff', background: '#e4572e'}}}]},
+        annotations: {xaxis: expAnnotations(), yaxis: [{y: 22.5, borderColor: '#e4572e', strokeDashArray: 4, label: {text: '22,5 °C', style: {color: '#fff', background: '#e4572e'}}}]},
     });
     draw('c-flow', {
         ...base({chart: {type: 'line'}, rest: {}}),
@@ -164,6 +191,7 @@ async function load(range) {
         xaxis: {type: 'numeric', title: {text: 'Außentemperatur °C'}, decimalsInFloat: 1, tickAmount: 8},
         yaxis: {decimalsInFloat: 0, ...flowBounds(h.curve), title: {text: 'Vorlauf °C'}},
         markers: {size: 4},
+        annotations: {},
         tooltip: {x: {formatter: (v) => `${v} °C außen`}},
     });
     draw('c-power', {
@@ -185,6 +213,7 @@ async function load(range) {
             {name: 'Energie (kWh)', type: 'line', data: h.daily.map((d) => d.kwh ?? null)},
         ],
         xaxis: {categories: days},
+        annotations: {},
         stroke: {width: [0, 0, 3]},
         yaxis: [
             {seriesName: 'Starts', title: {text: 'Starts'}, decimalsInFloat: 0},
@@ -193,6 +222,8 @@ async function load(range) {
         ],
         tooltip: {shared: true},
     });
+    renderHdd(h);
+    renderPhases(h);
     renderStates(h);
     document.getElementById('state-legend').innerHTML = Object.entries(STATE_COLORS).map(([k, c]) => `<span><i style="background:${c}"></i>${k}</span>`).join('');
 }

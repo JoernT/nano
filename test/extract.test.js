@@ -102,3 +102,37 @@ test('pearson', () => {
     assert.equal(pearson([[1, 6], [2, 4], [3, 2]]), -1);
     assert.equal(pearson([[1, 1], [2, 2]]), undefined);
 });
+
+import {heatingDegreeDays, dayStartMs, phaseStats} from '../src/cycles.js';
+
+test('heatingDegreeDays uses 20/15', () => {
+    assert.equal(heatingDegreeDays(3), 17);
+    assert.equal(heatingDegreeDays(15), 0);
+    assert.equal(heatingDegreeDays(undefined), 0);
+});
+
+test('dayStartMs is local midnight (winter and summer)', () => {
+    assert.equal(new Date(dayStartMs('2026-11-10')).toISOString(), '2026-11-09T23:00:00.000Z');
+    assert.equal(new Date(dayStartMs('2026-07-10')).toISOString(), '2026-07-09T22:00:00.000Z');
+});
+
+test('phaseStats splits full days by experiment and skips mixed and running days', () => {
+    const day = (d, starts, kwh, hdd) => ({day: d, starts, shortCycles: 0, kwh, hdd});
+    const daily = [day('2026-11-05', 30, 28, 14), day('2026-11-06', 28, 26, 14), day('2026-11-07', 26, 20, 14), day('2026-11-08', 20, 14, 14), day('2026-11-09', 18, 14, 14)];
+    const at = Date.parse('2026-11-07T14:00:00+01:00');
+    const now = Date.parse('2026-11-09T12:00:00+01:00');
+    const [before, after] = phaseStats(daily, [{at, label: 'Kurve -2 K'}], now);
+    assert.equal(before.days, 2); // 11-05, 11-06
+    assert.equal(before.starts, 29);
+    assert.equal(before.kwhPerHdd, 1.93); // (2 + 1.857) / 2
+    assert.equal(after.days, 1); // 11-08 only: 11-07 has the change, 11-09 is running
+    assert.equal(after.label, 'Kurve -2 K');
+    assert.equal(after.kwhPerHdd, 1);
+});
+
+test('phaseStats skips days that start before the data does', () => {
+    const daily = [{day: '2026-11-07', starts: 9, shortCycles: 0, kwh: 5, hdd: 14}, {day: '2026-11-08', starts: 20, shortCycles: 0, kwh: 14, hdd: 14}];
+    const [p] = phaseStats(daily, [], Date.parse('2026-11-10T12:00:00+01:00'), 'Europe/Berlin', Date.parse('2026-11-07T01:30:00+01:00'));
+    assert.equal(p.days, 1);
+    assert.equal(p.starts, 20);
+});

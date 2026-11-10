@@ -1,7 +1,7 @@
 // Read-only history for the report page (src/report.html): queries InfluxDB so the browser never needs a token.
 import {InfluxDB} from '@influxdata/influxdb-client';
 import {readFileSync} from 'node:fs';
-import {compressorHz, detectCycles, dailyStats, summary, pearson, TZ} from './cycles.js';
+import {compressorHz, detectCycles, dailyStats, summary, pearson, heatingDegreeDays, phaseStats, TZ} from './cycles.js';
 
 // energy per day against the daily mean outdoor temperature
 function dailyCorrelation(daily) {
@@ -20,6 +20,16 @@ const STATES = [
 // room names live in rooms.json; points written before a sensor was named keep their raw id
 function roomNames() {
     try { return JSON.parse(readFileSync(new URL('./rooms.json', import.meta.url), 'utf8')); } catch { return {}; }
+}
+
+// changes made on the unit, newest last: [{"at": "2026-11-10T14:00:00+01:00", "label": "FSV 2022 -2 K"}]; see docs/findings.md
+function experiments() {
+    try {
+        return JSON.parse(readFileSync(new URL('./experiments.json', import.meta.url), 'utf8'))
+            .map((e) => ({at: Date.parse(e.at), label: String(e.label || 'Änderung')}))
+            .filter((e) => Number.isFinite(e.at))
+            .sort((a, b) => a.at - b.at);
+    } catch { return []; }
 }
 
 export function createHistory(config) {
@@ -86,10 +96,23 @@ export function createHistory(config) {
             const k = new Date(Date.parse(r._time) - 1).toLocaleDateString('sv-SE', {timeZone: TZ});
             (outByDay.get(k) || outByDay.set(k, []).get(k)).push(r._value);
         }
+        // daily mean of the named rooms (the unnamed sensor is left out)
+        const named = new Set(Object.values(names));
+        const roomByDay = new Map();
+        for (const [id, pts] of Object.entries(rooms)) {
+            if (!named.has(id)) continue;
+            for (const [t, v] of pts) {
+                const k = new Date(t).toLocaleDateString('sv-SE', {timeZone: TZ});
+                (roomByDay.get(k) || roomByDay.set(k, []).get(k)).push(v);
+            }
+        }
+        const mean1 = (xs) => (xs?.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : undefined);
         const daily = dailyStats(runs).map((d) => {
-            const o = outByDay.get(d.day);
-            return {...d, kwh: kwh.get(d.day), outdoor: o ? Math.round((o.reduce((a, b) => a + b, 0) / o.length) * 10) / 10 : undefined};
+            const outdoor = mean1(outByDay.get(d.day));
+            return {...d, kwh: kwh.get(d.day), outdoor, hdd: heatingDegreeDays(outdoor), roomMean: mean1(roomByDay.get(d.day))};
         });
+        const exps = experiments();
+        const phases = phaseStats(daily, exps, Date.now(), TZ, samples[0]?.t);
 
         const states = {};
         for (const s of STATES) {
@@ -120,6 +143,8 @@ export function createHistory(config) {
             runs,
             summary: summary(runs),
             daily,
+            experiments: exps,
+            phases,
             states,
         };
     };

@@ -18,3 +18,9 @@ nav button.active { background: var(--fg); color: var(--bg); }
 .panel h2 { font-size: 1rem; font-weight: 400; margin: 0 0 .5rem; }
 .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: .5rem 0 0; font-size: .85rem; color: var(--muted); }
 .legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .35rem; vertical-align: -1px; }
+
+.panel h2 small { font-weight: 400; font-size: .75rem; color: var(--muted); margin-left: .4rem; }
+table.phases { width: 100%; border-collapse: collapse; font-size: .9rem; }
+table.phases th, table.phases td { text-align: right; padding: .35rem .5rem; border-bottom: 1px solid var(--muted); }
+table.phases th:first-child, table.phases td:first-child { text-align: left; }
+table.phases th { color: var(--muted); font-weight: 400; }

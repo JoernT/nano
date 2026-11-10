@@ -86,3 +86,53 @@ export function pearson(pairs) {
     if (!sxx || !syy) return undefined;
     return Math.round((sxy / Math.sqrt(sxx * syy)) * 100) / 100;
 }
+
+/** Gradtag 20/15 (German convention): 20 °C minus the daily mean outdoor temperature on heating days (mean < 15 °C), else 0 */
+export function heatingDegreeDays(meanOutdoor) {
+    if (meanOutdoor === undefined || meanOutdoor === null || meanOutdoor >= 15) return 0;
+    return Math.round((20 - meanOutdoor) * 10) / 10;
+}
+
+/** start of a local calendar day ('YYYY-MM-DD' in tz) as epoch ms */
+export function dayStartMs(day, tz = TZ) {
+    const utcMidnight = Date.parse(`${day}T00:00:00Z`);
+    const local = (ms) => Date.parse(new Date(ms).toLocaleString('sv-SE', {timeZone: tz}).replace(' ', 'T') + 'Z');
+    // offset of tz at that moment; one correction step handles the DST day itself
+    let start = utcMidnight - (local(utcMidnight) - utcMidnight);
+    start = utcMidnight - (local(start) - start);
+    return start;
+}
+
+/**
+ * Compare operating phases separated by experiments (changes made on the unit, see src/experiments.json).
+ * Only complete days inside one phase count: days containing a change and the running day are left out.
+ * since: first moment with data; days starting earlier are incomplete.
+ * daily: rows from dailyStats with optional kwh, hdd, roomMean. experiments: [{at: ms, label}] sorted.
+ */
+export function phaseStats(daily, experiments, now = Date.now(), tz = TZ, since = -Infinity) {
+    const bounds = experiments.map((e) => e.at);
+    const phases = [{label: 'vor der ersten Änderung', from: -Infinity, days: []}, ...experiments.map((e) => ({label: e.label, from: e.at, days: []}))];
+    for (const d of daily) {
+        const start = dayStartMs(d.day, tz);
+        const end = dayStartMs(new Date(start + 36 * 3600_000).toLocaleDateString('sv-SE', {timeZone: tz}), tz);
+        if (end > now) continue; // running day
+        if (start < since) continue; // data starts during this day
+        const p = bounds.filter((b) => b <= start).length;
+        if (bounds.some((b) => b > start && b < end)) continue; // change happened during this day
+        phases[p].days.push(d);
+    }
+    const avg = (xs) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100 : undefined);
+    return phases.map((ph) => {
+        const withHdd = ph.days.filter((d) => d.kwh !== undefined && d.hdd >= 1);
+        return {
+            label: ph.label,
+            from: Number.isFinite(ph.from) ? ph.from : null,
+            days: ph.days.length,
+            starts: avg(ph.days.map((d) => d.starts)),
+            shortCycles: avg(ph.days.map((d) => d.shortCycles)),
+            kwh: avg(ph.days.filter((d) => d.kwh !== undefined).map((d) => d.kwh)),
+            kwhPerHdd: avg(withHdd.map((d) => d.kwh / d.hdd)),
+            roomMean: avg(ph.days.filter((d) => d.roomMean !== undefined).map((d) => d.roomMean)),
+        };
+    });
+}
