@@ -74,3 +74,15 @@ export function summary(runs) {
         medianRunMinutes: Math.round((mins.length % 2 ? mins[mid] : (mins[mid - 1] + mins[mid]) / 2) * 10) / 10,
     };
 }
+
+/** Pearson correlation of [x, y] pairs, undefined when fewer than 3 pairs or no variance */
+export function pearson(pairs) {
+    const n = pairs.length;
+    if (n < 3) return undefined;
+    const mx = pairs.reduce((a, [x]) => a + x, 0) / n;
+    const my = pairs.reduce((a, [, y]) => a + y, 0) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (const [x, y] of pairs) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; syy += (y - my) ** 2; }
+    if (!sxx || !syy) return undefined;
+    return Math.round((sxy / Math.sqrt(sxx * syy)) * 100) / 100;
+}

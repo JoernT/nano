@@ -1,7 +1,12 @@
 // Read-only history for the report page (src/report.html): queries InfluxDB so the browser never needs a token.
 import {InfluxDB} from '@influxdata/influxdb-client';
 import {readFileSync} from 'node:fs';
-import {compressorHz, detectCycles, dailyStats, summary, TZ} from './cycles.js';
+import {compressorHz, detectCycles, dailyStats, summary, pearson, TZ} from './cycles.js';
+
+// energy per day against the daily mean outdoor temperature
+function dailyCorrelation(daily) {
+    return {kwhVsOutdoor: pearson(daily.filter((d) => d.kwh !== undefined && d.outdoor !== undefined).map((d) => [d.outdoor, d.kwh]))};
+}
 
 // allowed ranges: hours back and the averaging window for continuous series
 export const RANGES = {'24h': {hours: 24, every: '5m'}, '7d': {hours: 168, every: '15m'}, '30d': {hours: 720, every: '1h'}};
@@ -32,7 +37,11 @@ export function createHistory(config) {
             |> filter(fn: (r) => r._measurement == "${measurement}" and r._field == "${field}" ${extra})
             |> aggregateWindow(every: ${every}, fn: mean, createEmpty: false)`);
 
-        const [temps, roomRows, power, cycleRows, stateRows, energyRows] = await Promise.all([
+        const hourly = (measurement, extra) => rows(`${base} |> range(start: -${hours}h)
+            |> filter(fn: (r) => r._measurement == "${measurement}" and r._field == "temp" ${extra})
+            |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)`);
+
+        const [temps, roomRows, power, cycleRows, stateRows, energyRows, outdoorRows, outdoorHourly, flowHourly] = await Promise.all([
             mean('temperature', 'temp'),
             mean('room_climate', 'temp'),
             mean('powerconsumption', 'power', 'and r.component == "heatpump"'),
@@ -49,6 +58,9 @@ export function createHistory(config) {
                 |> filter(fn: (r) => r._measurement == "powerconsumption" and r._field == "energy" and r.component == "heatpump")
                 |> aggregateWindow(every: 1d, fn: last, createEmpty: false)
                 |> difference()`),
+            mean('weather', 'temp'),
+            hourly('weather', ''),
+            hourly('temperature', 'and r.component == "heating"'),
         ]);
 
         const group = (rs, tag) => {
@@ -69,12 +81,27 @@ export function createHistory(config) {
             .filter((s) => s.hz !== undefined);
         const runs = detectCycles(samples);
         const kwh = new Map(energyRows.map((r) => [new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ}), Math.round(r._value * 10) / 10]));
-        const daily = dailyStats(runs).map((d) => ({...d, kwh: kwh.get(d.day)}));
+        const outByDay = new Map();
+        for (const r of outdoorHourly) {
+            const k = new Date(Date.parse(r._time) - 1).toLocaleDateString('sv-SE', {timeZone: TZ});
+            (outByDay.get(k) || outByDay.set(k, []).get(k)).push(r._value);
+        }
+        const daily = dailyStats(runs).map((d) => {
+            const o = outByDay.get(d.day);
+            return {...d, kwh: kwh.get(d.day), outdoor: o ? Math.round((o.reduce((a, b) => a + b, 0) / o.length) * 10) / 10 : undefined};
+        });
 
         const states = {};
         for (const s of STATES) {
             states[s.key] = stateRows.filter((r) => r.component === s.component && r.attribute === s.attribute).map((r) => [Date.parse(r._time), r._value]);
         }
+
+        // heating curve: hourly flow temperature against outdoor temperature
+        const flowByHour = new Map(flowHourly.map((r) => [Date.parse(r._time), r._value]));
+        const curve = outdoorHourly
+            .map((r) => [r._value, flowByHour.get(Date.parse(r._time))])
+            .filter(([o, f]) => f !== undefined)
+            .map(([o, f]) => [Math.round(o * 10) / 10, Math.round(f * 10) / 10]);
 
         return {
             range: rangeKey,
@@ -82,6 +109,12 @@ export function createHistory(config) {
             to: Date.now(),
             temps: group(temps, 'component'),
             rooms,
+            outdoor: pairs(outdoorRows),
+            curve,
+            correlation: {
+                flowVsOutdoor: pearson(curve),
+                ...dailyCorrelation(daily),
+            },
             power: pairs(power),
             hz: samples.map((s) => [s.t, s.hz]),
             runs,

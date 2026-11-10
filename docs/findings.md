@@ -50,7 +50,8 @@
 - Cycles are detected from the compressor frequency (outdoor blob byte 3, 5-minute samples), not from power: the power report is averaged over about 20 minutes and is too coarse. Byte 3 reads 0, 20 or 25 Hz in the 2026 data and up to about 70 Hz during hot-water charging, which fits a real frequency, but it has only been cross-checked against power roughly.
 - First numbers (7 days to 2026-11-10): 86 compressor starts, 4 short cycles (under 10 min), average run 39 min, median 30 min, about 25 kWh/day (11-08: 35 starts, 24.9 kWh; 11-09: 26 starts, 24 kWh).
 - The unit mostly runs at its minimum of 20 Hz at about 1 kW, so it modulates at the lower limit and cycles (about 26 starts per day on a full day). Combined with the rooms above 22.5 °C this points to a too-high curve for the current load.
-- No outdoor temperature is stored in Influx, so the report has no outdoor line yet.
+- Outdoor temperature (2026-11-10): the poller now writes hourly `weather` points (tag `source=open-meteo`, fields `temp`, `humidity`; DWD ICON model for 52.44N/13.30E, no API key) and backfills 30 days on start. wetter.com has no free API, so it is not used. The report shows the outdoor line in the room chart, a heating-curve scatter (hourly flow vs outdoor) and Pearson r values.
+- First correlations (7 days, outdoor only 2-3.5 °C daily mean): flow vs outdoor r = 0.27, kWh/day vs outdoor r = -0.08. Too little outdoor spread yet to say anything; recheck when it gets colder or over 30 days.
 
 ## Open questions
 1. **Which blob bytes are temperatures, and what are they?** Outdoor bytes 6–8 and indoor bytes 0, 2, 3 look like temperatures (flow, return, discharge or defrost sensors). Outdoor bytes 10–11 (about 0–2000, falling while running) could be a defrost or anti-short-cycle timer. Indoor byte 8 (0–100) could be a pump or valve percentage. The rest are not understood. Needs experiments on the real unit: change a setpoint or mode and see which bytes move.

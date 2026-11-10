@@ -15,6 +15,7 @@ import {InfluxDB, Point} from '@influxdata/influxdb-client';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
 import {createHistory, RANGES} from './history.js';
+import {fetchOutdoor} from './weather.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -311,10 +312,31 @@ export async function startPolling(config) {
         }
     };
 
+    // outdoor temperature: hourly values, rewriting the same hour is idempotent; 30 days backfill on start
+    let weatherDays = 30;
+    const pollWeather = async () => {
+        try {
+            const rows = await fetchOutdoor(undefined, weatherDays);
+            for (const w of rows) {
+                const pt = new Point('weather').tag('source', 'open-meteo').floatField('temp', w.temp).timestamp(new Date(w.time));
+                if (w.humidity !== undefined) pt.floatField('humidity', w.humidity);
+                writeApi.writePoint(pt);
+            }
+            await writeApi.flush();
+            weatherDays = 2;
+            log(`outdoor temperature: ${rows.length} hourly points`);
+        } catch (e) {
+            log('outdoor temperature failed:', e.message);
+        }
+    };
+
     await poll();
+    pollWeather();
     const timer = setInterval(poll, config.intervalMs);
+    const weatherTimer = setInterval(pollWeather, 3600_000);
     const shutdown = async () => {
         clearInterval(timer);
+        clearInterval(weatherTimer);
         server?.close();
         try { await writeApi.close(); } catch (e) { log('flush on shutdown failed:', e.message); }
         process.exit(0);

@@ -85,8 +85,8 @@ async function load(range) {
 
     draw('c-rooms', {
         ...base({chart: {type: 'line'}, rest: {}}),
-        series: Object.entries(h.rooms).map(([name, data]) => ({name: ROOM_LABEL[name] || name, data})),
-        stroke: {width: 2, curve: 'smooth'},
+        series: [...Object.entries(h.rooms).map(([name, data]) => ({name: ROOM_LABEL[name] || name, data})), {name: 'Außen (DWD)', data: h.outdoor || []}],
+        stroke: {width: [...Object.keys(h.rooms).map(() => 2), 2], curve: 'smooth', dashArray: [...Object.keys(h.rooms).map(() => 0), 5]},
         yaxis: {decimalsInFloat: 1, title: {text: '°C'}},
         annotations: {yaxis: [{y: 22.5, borderColor: '#e4572e', strokeDashArray: 4, label: {text: '22,5 °C', style: {color: '#fff', background: '#e4572e'}}}]},
     });
@@ -98,6 +98,19 @@ async function load(range) {
         ],
         stroke: {width: 2, curve: 'smooth'},
         yaxis: {decimalsInFloat: 1, title: {text: '°C'}},
+    });
+    const c = h.correlation || {};
+    document.getElementById('corr').textContent = [
+        c.flowVsOutdoor !== undefined ? `r = ${c.flowVsOutdoor} (Vorlauf/außen)` : '',
+        c.kwhVsOutdoor !== undefined ? `r = ${c.kwhVsOutdoor} (kWh/Tag vs. außen)` : '',
+    ].filter(Boolean).join(' · ');
+    draw('c-curve', {
+        ...base({chart: {type: 'scatter', group: undefined, zoom: {type: 'xy'}}, rest: {}}),
+        series: [{name: 'Stundenmittel', data: h.curve || []}],
+        xaxis: {type: 'numeric', title: {text: 'Außentemperatur °C'}, decimalsInFloat: 0, tickAmount: 10},
+        yaxis: {decimalsInFloat: 0, title: {text: 'Vorlauf °C'}},
+        markers: {size: 4},
+        tooltip: {x: {formatter: (v) => `${v} °C außen`}},
     });
     draw('c-power', {
         ...base({chart: {type: 'line'}, rest: {}}),

@@ -87,3 +87,18 @@ test('compressorHz reads byte 3 of the outdoor blob', () => {
     assert.equal(compressorHz('0014001900'), 25);
     assert.equal(compressorHz('00'), undefined);
 });
+
+import {parseHourly} from '../src/weather.js';
+import {pearson} from '../src/cycles.js';
+
+test('parseHourly drops future and null hours', () => {
+    const now = 3600_000 * 3;
+    const out = parseHourly({hourly: {time: [0, 3600, 7200, 14400], temperature_2m: [1.5, null, 3, 9], relative_humidity_2m: [80, 80, 70, 60]}}, now);
+    assert.deepEqual(out, [{time: 0, temp: 1.5, humidity: 80}, {time: 7200000, temp: 3, humidity: 70}]);
+});
+
+test('pearson', () => {
+    assert.equal(pearson([[1, 2], [2, 4], [3, 6]]), 1);
+    assert.equal(pearson([[1, 6], [2, 4], [3, 2]]), -1);
+    assert.equal(pearson([[1, 1], [2, 2]]), undefined);
+});
