@@ -150,4 +150,4 @@ nav.addEventListener('click', (e) => {
     nav.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
     load(b.dataset.range);
 });
-load('7d');
+load('24h');
