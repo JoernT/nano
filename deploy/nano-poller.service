@@ -1,0 +1,16 @@
+[Unit]
+Description=nano heat pump poller (SmartThings -> InfluxDB)
+After=network-online.target influxdb.service
+Wants=network-online.target
+
+[Service]
+User=jwt
+WorkingDirectory=/home/jwt/nano
+EnvironmentFile=/home/jwt/nano/.env
+Environment=STATUS_HOST=0.0.0.0
+ExecStart=/usr/bin/node src/nano.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
