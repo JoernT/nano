@@ -14,11 +14,19 @@ import axios from 'axios';
 import {InfluxDB, Point} from '@influxdata/influxdb-client';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
+import {execFile} from 'node:child_process';
 import {createHistory, RANGES} from './history.js';
 import {fetchOutdoor} from './weather.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
+
+// systemd watchdog: when started with WatchdogSec= (NOTIFY_SOCKET is set), tell systemd after every finished poll
+// that we are alive; if polls stop completing (hang), systemd restarts the service. No-op outside systemd.
+const watchdog = (state = 'WATCHDOG=1') => {
+    if (!process.env.NOTIFY_SOCKET) return;
+    execFile('systemd-notify', [state], (e) => { if (e) log('systemd-notify failed:', e.message); });
+};
 
 async function loadConfig(env = process.env) {
     let legacy = {};
@@ -309,6 +317,8 @@ export async function startPolling(config) {
             note(`FAILED${http}: ${e.message}`);
         } finally {
             running = false;
+            // a finished poll (successful or not) proves the loop is alive; a hung one never gets here
+            watchdog();
         }
     };
 
