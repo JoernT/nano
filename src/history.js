@@ -56,6 +56,14 @@ export function createHistory(config) {
             |> filter(fn: (r) => r._measurement == "temperature" and r._field == "temp")
             |> group(columns: ["component"]) |> last()`);
 
+        // kWh per month and year over all recorded data (the counter is cumulative: daily last value, differences summed)
+        const totalsRows = rows(`import "timezone"
+            option location = timezone.location(name: "${TZ}")
+            ${base} |> range(start: 0)
+            |> filter(fn: (r) => r._measurement == "powerconsumption" and r._field == "energy" and r.component == "heatpump")
+            |> aggregateWindow(every: 1d, fn: last, createEmpty: false)
+            |> difference()`);
+
         const [temps, roomRows, power, cycleRows, stateRows, energyRows, outdoorRows, outdoorHourly, flowHourly, beforeRows] = await Promise.all([
             mean('temperature', 'temp'),
             mean('room_climate', 'temp'),
@@ -78,6 +86,24 @@ export function createHistory(config) {
             hourly('temperature', 'and r.component == "heating"'),
             tempsBefore,
         ]);
+        const totalsData = await totalsRows;
+        const energyTotals = (() => {
+            const months = new Map();
+            // the first row has no earlier day to subtract from (it is the counter's lifetime total), so it is skipped
+            for (const r of totalsData.slice(1)) {
+                if (!(r._value >= 0)) continue; // counter reset
+                const day = new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ});
+                const m = months.get(day.slice(0, 7)) || months.set(day.slice(0, 7), {month: day.slice(0, 7), kwh: 0, days: 0}).get(day.slice(0, 7));
+                m.kwh += r._value; m.days++;
+            }
+            const years = new Map();
+            for (const m of months.values()) {
+                const y = years.get(m.month.slice(0, 4)) || years.set(m.month.slice(0, 4), {year: m.month.slice(0, 4), kwh: 0, days: 0}).get(m.month.slice(0, 4));
+                y.kwh += m.kwh; y.days += m.days;
+            }
+            const round = (o) => ({...o, kwh: Math.round(o.kwh * 10) / 10});
+            return {months: [...months.values()].map(round), years: [...years.values()].map(round)};
+        })();
         const to = Date.now();
         const from = to - hours * 3600_000;
 
@@ -164,6 +190,7 @@ export function createHistory(config) {
             runs,
             summary: summary(runs),
             daily,
+            energyTotals,
             experiments: exps,
             phases,
             states,

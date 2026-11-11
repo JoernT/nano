@@ -63,6 +63,14 @@ function renderHdd(h) {
     });
 }
 
+function renderTotals(h) {
+    const t = h.energyTotals || {months: [], years: []};
+    const tbl = (rows, key, label) => `<table class="phases"><thead><tr><th>${label}</th><th>kWh</th><th>erfasste Tage</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[key]}</td><td>${fmt(r.kwh)}</td><td>${r.days}</td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('totals').innerHTML = t.months.length
+        ? tbl([...t.years].reverse(), 'year', 'Jahr') + '<br>' + tbl([...t.months].reverse(), 'month', 'Monat')
+        : '<p class="msg">Noch keine Energiedaten.</p>';
+}
+
 function renderPhases(h) {
     const f = (v, d = 1) => (v === undefined ? '–' : Number(v).toFixed(d));
     const rows = h.phases.map((p) => `<tr><td>${p.label}${p.from ? ` <small>ab ${new Date(p.from).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</small>` : ''}</td><td>${p.days}</td><td>${f(p.kwhPerHdd, 2)}</td><td>${f(p.kwh)}</td><td>${f(p.starts, 0)}</td><td>${f(p.shortCycles)}</td><td>${f(p.roomMean)}</td></tr>`).join('');
@@ -223,6 +231,7 @@ async function load(range) {
         tooltip: {shared: true},
     });
     renderHdd(h);
+    renderTotals(h);
     renderPhases(h);
     renderStates(h);
     document.getElementById('state-legend').innerHTML = Object.entries(STATE_COLORS).map(([k, c]) => `<span><i style="background:${c}"></i>${k}</span>`).join('');
