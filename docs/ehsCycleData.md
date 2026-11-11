@@ -40,6 +40,16 @@ so a layout change can be matched to a firmware change in the history.
 | 8 | 0..100 | unknown |
 | 22-23 | looks like a counter / checksum | unknown |
 
+## Check for heat output (2026-11-11, 1227 samples, 11-07 .. 11-11)
+
+Goal: find flow rate or return temperature in the indoor blob, to compute heat = flow x delta-T x 1.16 Wh/(l K).
+Method: correlate every byte with the recorded flow temperature (INDOOR2).
+
+- byte 29 (range 83..91) correlates 0.79 with the flow temperature: likely a flow-side temperature, scale not yet known.
+- bytes 0, 2, 3 (look like 59..114) do **not** follow the flow temperature, and a Fahrenheit reading (x - 32) / 1.8 is off by 0.5..3 K with a spread of 1.5..3.4 K: not the flow temperature in F.
+- byte 22 correlates -0.40 and byte 9 -0.32 with it (byte 9 is the hot-water flag, so that is the valve changing the flow temperature).
+- No byte so far looks like a flow rate. Without it there is no heat figure; the display values stay the reliable source.
+
 ## How to find out more
 - Samples are snapshots in 5 minute slots. A stop shorter than one slot can be missed.
 - To pin down the unknown fields, change a setting on the pump (setpoint, mode, boost) and watch which bytes move.
