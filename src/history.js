@@ -129,7 +129,8 @@ export function createHistory(config) {
         const names = roomNames();
         const rooms = {};
         for (const [id, pts] of Object.entries(group(roomRows, 'room'))) {
-            (rooms[names[id] || id] ||= []).push(...pts);
+            const name = names[id] || (Object.values(names).includes(id) ? id : null);
+            if (name) (rooms[name] ||= []).push(...pts); // unnamed sensors are recorded but not charted
         }
         for (const pts of Object.values(rooms)) pts.sort((a, b) => a[0] - b[0]);
 

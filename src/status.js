@@ -1,7 +1,11 @@
 // poller status for the <details id="status"> block in index.html: badge always visible, details on demand
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
-const ago = (d) => (d ? `${Math.round((Date.now() - new Date(d)) / 1000)} s her` : 'nie');
-const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(x.value) + unit : '–'}</td><td>${x?.at ? ago(x.at) : ''}</td></tr>`;
+const ago = (d) => {
+    if (!d) return 'nie';
+    const s = Math.round((Date.now() - new Date(d)) / 1000);
+    return s < 120 ? `vor ${s} s` : s < 7200 ? `vor ${Math.round(s / 60)} min` : s < 172800 ? `vor ${Math.round(s / 3600)} h` : `vor ${Math.round(s / 86400)} d`;
+};
+const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(typeof x.value === 'number' ? Math.round(x.value * 10) / 10 : x.value) + unit : '–'}</td><td>${x?.at ? ago(x.at) : ''}</td></tr>`;
 
 async function refresh() {
     const badge = document.getElementById('st-badge');

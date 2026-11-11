@@ -35,9 +35,9 @@ section.states { display: flex; flex-wrap: wrap; justify-content: center; gap: .
 /* highlight active states (booster heater on, defrost running) */
 .chip[data-state="on"] { background: rgba(245,124,0,0.3); }
 
-fx-trigger.reload { position: absolute; right: 0; top: 0; width: 2rem; height: 2rem; }
-fx-trigger.reload img { position: static; width: 1rem; height: 1rem; padding: .5rem; border-radius: 50%; background: var(--panel); cursor: pointer; }
-.icon.action { background: var(--panel); }
+fx-trigger.reload { position: absolute; right: 0; top: 0; width: 2.2rem; height: 2.2rem; }
+fx-trigger.reload img.icon { position: static; display: block; width: 2.2rem; height: 2.2rem; padding: .5rem; border-radius: 50%; background: var(--panel); border: 1px solid var(--muted); cursor: pointer; }
+fx-trigger.reload img.icon:hover { background: var(--muted); }
 @media (prefers-color-scheme: dark) { .icon, fx-trigger.reload img { filter: invert(1); } }
 
 details.info { max-width: 36rem; margin: 1rem auto 0; font-size: .9rem; background: var(--panel); border-radius: 1rem; padding: .4rem 1rem; }

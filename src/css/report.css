@@ -25,3 +25,6 @@ table.phases { width: 100%; border-collapse: collapse; font-size: .9rem; }
 table.phases th, table.phases td { text-align: right; padding: .35rem .5rem; border-bottom: 1px solid var(--muted); }
 table.phases th:first-child, table.phases td:first-child { text-align: left; }
 table.phases th { color: var(--muted); font-weight: 400; }
+
+table.totals { table-layout: fixed; }
+table.totals th:first-child { width: 40%; }

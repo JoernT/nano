@@ -65,7 +65,7 @@ function renderHdd(h) {
 
 function renderTotals(h) {
     const t = h.energyTotals || {months: [], years: []};
-    const tbl = (rows, key, label) => `<table class="phases"><thead><tr><th>${label}</th><th>kWh</th><th>erfasste Tage</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[key]}</td><td>${fmt(r.kwh)}</td><td>${r.days}</td></tr>`).join('')}</tbody></table>`;
+    const tbl = (rows, key, label) => `<table class="phases totals"><thead><tr><th>${label}</th><th>kWh</th><th>erfasste Tage</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[key]}</td><td>${fmt(r.kwh)}</td><td>${r.days}</td></tr>`).join('')}</tbody></table>`;
     document.getElementById('totals').innerHTML = t.months.length
         ? tbl([...t.years].reverse(), 'year', 'Jahr') + '<br>' + tbl([...t.months].reverse(), 'month', 'Monat')
         : '<p class="msg">Noch keine Energiedaten.</p>';
