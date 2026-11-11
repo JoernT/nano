@@ -51,7 +51,12 @@ export function createHistory(config) {
             |> filter(fn: (r) => r._measurement == "${measurement}" and r._field == "temp" ${extra})
             |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)`);
 
-        const [temps, roomRows, power, cycleRows, stateRows, energyRows, outdoorRows, outdoorHourly, flowHourly] = await Promise.all([
+        // the device only reports a temperature when it changes: remember the value that was valid when the window starts
+        const tempsBefore = rows(`${base} |> range(start: -90d, stop: -${hours}h)
+            |> filter(fn: (r) => r._measurement == "temperature" and r._field == "temp")
+            |> group(columns: ["component"]) |> last()`);
+
+        const [temps, roomRows, power, cycleRows, stateRows, energyRows, outdoorRows, outdoorHourly, flowHourly, beforeRows] = await Promise.all([
             mean('temperature', 'temp'),
             mean('room_climate', 'temp'),
             mean('powerconsumption', 'power', 'and r.component == "heatpump"'),
@@ -71,13 +76,29 @@ export function createHistory(config) {
             mean('weather', 'temp'),
             hourly('weather', ''),
             hourly('temperature', 'and r.component == "heating"'),
+            tempsBefore,
         ]);
+        const to = Date.now();
+        const from = to - hours * 3600_000;
 
         const group = (rs, tag) => {
             const out = {};
             for (const r of rs) (out[r[tag]] ||= []).push(r);
             return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, pairs(v)]));
         };
+
+        // on-change series: hold the value from before the window at its start and the last value up to the window end,
+        // otherwise a temperature that has not changed for a while looks like the data stopped
+        const tempSeries = group(temps, 'component');
+        const gapMs = {'5m': 300_000, '15m': 900_000, '1h': 3600_000}[every] * 2;
+        for (const r of beforeRows) {
+            const pts = (tempSeries[r.component] ||= []);
+            if (!pts.length || pts[0][0] - from > gapMs) pts.unshift([from, r._value]);
+        }
+        for (const pts of Object.values(tempSeries)) {
+            const last = pts[pts.length - 1];
+            if (last && last[0] < to) pts.push([to, last[1]]);
+        }
 
         const names = roomNames();
         const rooms = {};
@@ -128,9 +149,9 @@ export function createHistory(config) {
 
         return {
             range: rangeKey,
-            from: Date.now() - hours * 3600_000,
-            to: Date.now(),
-            temps: group(temps, 'component'),
+            from,
+            to,
+            temps: tempSeries,
             rooms,
             outdoor: pairs(outdoorRows),
             curve,
