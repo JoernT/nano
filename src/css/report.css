@@ -3,7 +3,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0 1rem 3rem; font-family: system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 72rem; margin-inline: auto; }
 .bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; padding: 1rem 0; }
-.bar h1 { font-size: 1.3rem; font-weight: 300; margin: 0; flex: 1; }
+.bar h1 { font-size: 1.3rem; font-weight: 300; margin: 0; }
+.bar nav { margin-left: auto; }
 .bar a { color: var(--muted); text-decoration: none; }
 nav button { border: 1px solid var(--muted); background: none; color: var(--fg); padding: .3rem .8rem; border-radius: 1rem; cursor: pointer; }
 nav button.active { background: var(--fg); color: var(--bg); }

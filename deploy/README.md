@@ -15,18 +15,18 @@ The poller (`src/nano.js`) runs on the Pi as a systemd service next to InfluxDB 
 ~/nano/.env            # secrets (chmod 600), INFLUX_URL=http://localhost:8086
 ~/nano/package.json    # {"type": "module"} + axios, openmeteo, @influxdata/influxdb-client
 ~/nano/src/            # nano.js history.js weather.js smartthings-auth.js cycles.js rooms.json experiments.json
-~/nano/dist/           # built dashboard + report (npm run build), served by nano.js
+~/nano/dist/           # built page (npm run build), served by nano.js
 ~/nano/src/room-sensors.py, ~/nano/requirements-ble.txt, ~/nano/.venv/   # room sensors (python3 -m venv .venv && .venv/bin/pip install -r requirements-ble.txt)
 ```
 
-The poller serves everything on port 8787: dashboard `/`, report `/report.html`, status page `/status`, API `/api/status` and `/api/history`.
+The poller serves everything on port 8787: one page `/` (dashboard, status, report), plain status page `/status`, `/status.json`, API `/api/status` and `/api/history`.
 
 Node 20 and npm come from apt (`sudo apt install nodejs npm`).
 
 ## Update
 
 ```sh
-npm run build                      # dashboard + report -> dist/
+npm run build                      # page -> dist/
 rsync -a --delete dist/ jwt@nano:nano/dist/   # or: ssh jwt@nano 'rm -rf nano/dist' && scp -r dist jwt@nano:nano/dist
 scp src/nano.js src/history.js src/weather.js src/smartthings-auth.js src/cycles.js src/rooms.json src/experiments.json jwt@nano:nano/src/
 ssh -t jwt@nano 'sudo systemctl restart nano-poller'   # only needed when the .js files changed; dist/ is read on every request

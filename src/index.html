@@ -7,6 +7,7 @@
     <link href="css/fore.css" rel="stylesheet"/>
     <link href="css/toastify.css" rel="stylesheet"/>
     <link href="css/vars.css" rel="stylesheet"/>
+    <link href="css/report.css" rel="stylesheet"/>
     <link href="css/nano.css" rel="stylesheet"/>
     <script type="module">
         // pinned to the version in package.json; swap for a bundled import when going offline
@@ -15,6 +16,18 @@
 
 </head>
 <body>
+<header class="bar">
+    <h1>Nano</h1>
+    <details id="status">
+        <summary><span id="st-badge" class="badge">…</span></summary>
+        <div id="st-body" class="panel"></div>
+    </details>
+    <nav id="ranges">
+        <button data-range="24h" class="active">24 h</button>
+        <button data-range="7d">7 Tage</button>
+        <button data-range="30d">30 Tage</button>
+    </nav>
+</header>
 <div class="wrapper">
     <fx-fore id="nano">
 
@@ -51,7 +64,6 @@
                 <div class="measurement">
                     <img class="icon" src="images/drop.png">
                     {instance('response')?components?main?temperatureMeasurement?temperature?value}°
-                    <img class="icon action boost" src="images/arrows.png">
                 </div>
             </section>
             <section>
@@ -83,8 +95,6 @@
             <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}"><span class="label">Ventil</span><span class="value">{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}</span></div>
             <div class="chip" data-state="{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}"><span class="label">Abtauen</span><span class="value">{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}</span></div>
         </section>
-        <a class="report-link" href="report.html">Report →</a>
-        <a class="report-link status-link" href="status">Status →</a>
         <fx-trigger class="reload">
             <img class="icon action" src="images/refresh.png">
             <fx-send submission="s-load-current"></fx-send>
@@ -92,5 +102,18 @@
 
     </fx-fore>
 </div>
+<p id="msg" class="msg">lade …</p>
+<p id="range-info" class="msg range-info"></p>
+<section id="summary" class="tiles"></section>
+<section class="panel"><h2>Raumtemperaturen</h2><div id="c-rooms"></div></section>
+<section class="panel"><h2>Vorlauf Heizung &amp; Warmwasser</h2><div id="c-flow"></div></section>
+<section class="panel"><h2>Heizkurve: Vorlauf vs. Außentemperatur <small id="corr"></small></h2><div id="c-curve"></div></section>
+<section class="panel"><h2>Leistung &amp; Verdichter</h2><div id="c-power"></div></section>
+<section class="panel"><h2>Starts pro Tag &amp; Energie</h2><div id="c-daily"></div></section>
+<section class="panel"><h2>Energie pro Gradtag <small>kWh je Gradtag 20/15, nur volle Tage</small></h2><div id="c-hdd"></div></section>
+<section class="panel"><h2>Phasen zwischen Änderungen <small>Änderungen in src/experiments.json eintragen</small></h2><div id="phases"></div></section>
+<section class="panel"><h2>Zustände</h2><div id="c-states"></div><p id="state-legend" class="legend"></p></section>
+<script type="module" src="report.js"></script>
+<script type="module" src="status.js"></script>
 </body>
 </html>

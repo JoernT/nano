@@ -277,7 +277,8 @@ function startStatusServer(config, status) {
         }
         if (req.url === '/status.json') {
             res.writeHead(200, {'content-type': 'application/json'});
-            return res.end(JSON.stringify(status));
+            const stale = !status.lastPollAt || Date.now() - status.lastPollAt > config.intervalMs * 2.5;
+            return res.end(JSON.stringify({...status, state: stale ? 'STALE' : status.lastError ? 'ERROR' : 'running', intervalMs: config.intervalMs, auth: authLine(config.smartthings.auth.info())}));
         }
         const pathname = decodeURIComponent(new URL(req.url || '/', 'http://x').pathname);
         if (pathname !== '/status') {
