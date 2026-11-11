@@ -1,0 +1,17 @@
+[Unit]
+Description=nano room sensors (SwitchBot Bluetooth -> InfluxDB)
+After=network-online.target influxdb.service bluetooth.service
+Wants=network-online.target bluetooth.service
+
+[Service]
+User=jwt
+WorkingDirectory=/home/jwt/nano
+EnvironmentFile=/home/jwt/nano/.env
+ExecStart=/home/jwt/nano/.venv/bin/python src/room-sensors.py
+Restart=always
+RestartSec=10
+# safeguard against a silently hanging Bluetooth stack; Restart=always brings it back
+RuntimeMaxSec=86400
+
+[Install]
+WantedBy=multi-user.target
