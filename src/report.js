@@ -65,9 +65,12 @@ function renderHdd(h) {
 
 function renderTotals(h) {
     const t = h.energyTotals || {months: [], years: []};
-    const tbl = (rows, key, label) => `<table class="phases totals"><thead><tr><th>${label}</th><th>kWh</th><th>erfasste Tage</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[key]}</td><td>${fmt(r.kwh)}</td><td>${r.days}</td></tr>`).join('')}</tbody></table>`;
+    const cell = (x, d = 1) => (x === undefined ? '–' : fmt(x, d));
+    const head = (label, last) => `<thead><tr><th>${label}</th><th>Strom kWh</th><th>Wärme kWh</th><th>COP</th><th>${last}</th></tr></thead>`;
+    const years = t.years.slice().reverse().map((y) => `<tr><td>${y.year}</td><td>${cell(y.consumed)}</td><td>${cell(y.produced, 0)}</td><td>${cell(y.cop, 2)}</td><td>${y.months} ${y.months === 1 ? "Monat" : "Monate"}</td></tr>`).join('');
+    const months = t.months.slice().reverse().map((m) => `<tr><td>${m.month}</td><td>${cell(m.consumed)}</td><td>${cell(m.produced, 0)}</td><td>${cell(m.cop, 2)}</td><td>${m.source === 'Display' ? 'Display' : `gemessen, ${m.days} Tage`}</td></tr>`).join('');
     document.getElementById('totals').innerHTML = t.months.length
-        ? tbl([...t.years].reverse(), 'year', 'Jahr') + '<br>' + tbl([...t.months].reverse(), 'month', 'Monat')
+        ? `<table class="phases totals">${head('Jahr', 'Basis')}<tbody>${years}</tbody></table><br><table class="phases totals">${head('Monat', 'Quelle')}<tbody>${months}</tbody></table>`
         : '<p class="msg">Noch keine Energiedaten.</p>';
 }
 

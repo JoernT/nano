@@ -22,6 +22,11 @@ function roomNames() {
     try { return JSON.parse(readFileSync(new URL('./rooms.json', import.meta.url), 'utf8')); } catch { return {}; }
 }
 
+// monthly values read off the heat pump's display, typed in by hand: {"months": {"2025-12": {"consumed": 812, "produced": 3100}}} (kWh)
+function energyHistory() {
+    try { return JSON.parse(readFileSync(new URL('./energy-history.json', import.meta.url), 'utf8')).months || {}; } catch { return {}; }
+}
+
 // changes made on the unit, newest last: [{"at": "2026-11-10T14:00:00+01:00", "label": "FSV 2022 -2 K"}]; see docs/findings.md
 function experiments() {
     try {
@@ -96,13 +101,25 @@ export function createHistory(config) {
                 const m = months.get(day.slice(0, 7)) || months.set(day.slice(0, 7), {month: day.slice(0, 7), kwh: 0, days: 0}).get(day.slice(0, 7));
                 m.kwh += r._value; m.days++;
             }
-            const years = new Map();
-            for (const m of months.values()) {
-                const y = years.get(m.month.slice(0, 4)) || years.set(m.month.slice(0, 4), {year: m.month.slice(0, 4), kwh: 0, days: 0}).get(m.month.slice(0, 4));
-                y.kwh += m.kwh; y.days += m.days;
-            }
             const round = (o) => ({...o, kwh: Math.round(o.kwh * 10) / 10});
-            return {months: [...months.values()].map(round), years: [...years.values()].map(round)};
+            // one row per month: the display value (full month) wins over our own, possibly partial, measurement
+            const manual = energyHistory();
+            const rows = new Map([...months.values()].map((m) => [m.month, {month: m.month, consumed: round(m).kwh, days: m.days, source: 'gemessen'}]));
+            for (const [month, v] of Object.entries(manual)) {
+                const row = rows.get(month) || rows.set(month, {month}).get(month);
+                if (Number.isFinite(v.consumed)) Object.assign(row, {consumed: v.consumed, days: undefined, source: 'Display'});
+                if (Number.isFinite(v.produced)) row.produced = v.produced;
+            }
+            const list = [...rows.values()].sort((a, b) => a.month.localeCompare(b.month));
+            const years = new Map();
+            for (const m of list) {
+                const y = years.get(m.month.slice(0, 4)) || years.set(m.month.slice(0, 4), {year: m.month.slice(0, 4), consumed: 0, months: 0, copConsumed: 0, copProduced: 0}).get(m.month.slice(0, 4));
+                if (m.consumed !== undefined) { y.consumed += m.consumed; y.months++; }
+                if (m.consumed !== undefined && m.produced !== undefined) { y.copConsumed += m.consumed; y.copProduced += m.produced; }
+            }
+            for (const m of list) if (m.consumed && m.produced !== undefined) m.cop = Math.round((m.produced / m.consumed) * 100) / 100;
+            const yl = [...years.values()].map((y) => ({year: y.year, consumed: Math.round(y.consumed * 10) / 10, months: y.months, produced: y.copProduced || undefined, cop: y.copConsumed ? Math.round((y.copProduced / y.copConsumed) * 100) / 100 : undefined}));
+            return {months: list, years: yl};
         })();
         const to = Date.now();
         const from = to - hours * 3600_000;
