@@ -30,22 +30,13 @@
                 </data>
             </fx-instance>
             <fx-instance id="response" type="json">{}</fx-instance>
-            <!-- served by the poller (src/nano.js, STATUS_PORT, default 8787); no token in the browser -->
+            <!-- same origin as this page: the poller (src/nano.js) serves the site and /api; no token in the browser -->
             <fx-submission id="s-load-current"
-                           url="http://nano.local:8787/api/status"
+                           url="/api/status"
                            method="get"
                            replace="instance"
                            instance="response">
                 <fx-message event="submit-done">aktualisiert</fx-message>
-            </fx-submission>
-
-            <fx-submission id="s-influx"
-                           url="http://nano.local:8086/query"
-                           method="get"
-                           response-mediatype="text/csv"
-                           replace="instance"
-                           instance="influx">
-
             </fx-submission>
         </fx-model>
         <section class="current">

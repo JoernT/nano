@@ -1,7 +1,7 @@
 import ApexCharts from 'apexcharts';
 
 // the poller (src/nano.js) serves the history from InfluxDB
-const API = `http://nano.local:8787/api/history`;
+const API = '/api/history';
 const GROUP = 'nano'; // same group = synchronised zoom and tooltip
 const charts = {};
 let view = {}; // selected window and experiments

@@ -15,6 +15,8 @@ import {InfluxDB, Point} from '@influxdata/influxdb-client';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
 import {execFile} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
 import {createHistory, RANGES} from './history.js';
 import {fetchOutdoor} from './weather.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
@@ -218,7 +220,26 @@ function authLine(i) {
     return `auth: oauth · access token until ${i.accessExpiresAt?.toLocaleString() ?? '?'} · <span${warn}>refresh token valid ~${Math.floor(days)}d (renewed on every refresh)</span>`;
 }
 
-// tiny read-only status page: http://localhost:8787 (STATUS_PORT=0 disables, STATUS_HOST to expose)
+// dashboard + report: the built site (`npm run build` -> dist/), served from the same origin as the API
+// (SITE_DIR overrides the location). Returns false when there is no such file.
+const SITE_ROOT = path.resolve(process.env.SITE_DIR || fileURLToPath(new URL('../dist/', import.meta.url))) + path.sep;
+const MIME = {
+    '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
+    '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+};
+async function serveSite(pathname, req, res) {
+    const file = path.resolve(SITE_ROOT, pathname === '/' ? 'index.html' : `.${pathname}`);
+    if (!file.startsWith(SITE_ROOT)) return false; // no path traversal
+    try {
+        const body = await readFile(file);
+        res.writeHead(200, {'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache'});
+        res.end(req.method === 'HEAD' ? undefined : body);
+        return true;
+    } catch { return false; }
+}
+
+// dashboard at /, report at /report.html, read-only status page at /status, JSON API under /api (STATUS_PORT=0 disables, STATUS_HOST to expose)
 function startStatusServer(config, status) {
     const port = Number(process.env.STATUS_PORT ?? 8787);
     if (!port) return null;
@@ -257,6 +278,17 @@ function startStatusServer(config, status) {
         if (req.url === '/status.json') {
             res.writeHead(200, {'content-type': 'application/json'});
             return res.end(JSON.stringify(status));
+        }
+        const pathname = decodeURIComponent(new URL(req.url || '/', 'http://x').pathname);
+        if (pathname !== '/status') {
+            serveSite(pathname, req, res).then((served) => {
+                if (served) return;
+                // no built site (yet): fall back to the status page at /, else 404
+                if (pathname === '/') { res.writeHead(302, {location: '/status'}); return res.end(); }
+                res.writeHead(404, {'content-type': 'text/plain'});
+                res.end('not found');
+            }).catch((e) => { res.writeHead(500); res.end(e.message); });
+            return;
         }
         const stale = !status.lastPollAt || Date.now() - status.lastPollAt > config.intervalMs * 2.5;
         res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});

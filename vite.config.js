@@ -1,10 +1,15 @@
 import {defineConfig} from 'vite';
 
-// The dashboard lives in src/ (src/index.html). It reads data from the poller (src/nano.js)
-// at http://localhost:8787/api/status, so run both: `npm run startnano` and `npm start`.
+// The dashboard lives in src/ (src/index.html). In production the poller (src/nano.js on the Pi) serves the built
+// site from dist/ together with /api, see deploy/README.md. For development, `npm start` proxies /api to the Pi
+// (override with NANO_API=http://localhost:8787 when running the poller locally).
 export default defineConfig({
     root: 'src',
-    server: {open: true},
+    base: './',
+    server: {
+        open: true,
+        proxy: {'/api': process.env.NANO_API || 'http://nano.local:8787'},
+    },
     build: {
         outDir: '../dist',
         emptyOutDir: true,
