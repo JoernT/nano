@@ -8,7 +8,7 @@ export default defineConfig({
     base: './',
     server: {
         open: true,
-        proxy: {'/api': process.env.NANO_API || 'http://nano.local:8787'},
+        proxy: Object.fromEntries(['/api', '/status'].map((p) => [p, process.env.NANO_API || 'http://nano.local:8787'])),
     },
     build: {
         outDir: '../dist',

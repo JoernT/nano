@@ -185,3 +185,4 @@ a.report-link {
     opacity: .7;
 }
 a.report-link:hover { opacity: 1; }
+a.status-link { top: 5.9rem; }
