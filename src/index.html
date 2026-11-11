@@ -32,7 +32,7 @@
             <fx-instance id="response" type="json">{}</fx-instance>
             <!-- served by the poller (src/nano.js, STATUS_PORT, default 8787); no token in the browser -->
             <fx-submission id="s-load-current"
-                           url="http://localhost:8787/api/status"
+                           url="http://nano.local:8787/api/status"
                            method="get"
                            replace="instance"
                            instance="response">
