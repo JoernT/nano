@@ -14,19 +14,28 @@ section.current section { text-align: center; }
 section.current header { font-size: 1.1rem; font-weight: 300; padding: .5rem 0 .8rem; }
 
 .measurement {
-    width: 5.5rem;
-    height: 5.5rem;
+    --accent: var(--muted);
+    width: min(8.5rem, 27vw);
+    aspect-ratio: 1;
     margin: 0 auto;
-    font-size: 1.5rem;
+    font-size: clamp(1.5rem, 6vw, 2rem);
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: var(--panel);
-    padding: .5rem;
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+    border: 3px solid var(--accent);
+    box-shadow: 0 0 1.2rem color-mix(in srgb, var(--accent) 35%, transparent);
+    padding: 1.2rem .5rem .3rem;
+    box-sizing: border-box;
     position: relative;
 }
-.icon { position: absolute; width: 1rem; height: 1rem; top: .7rem; }
+/* heat red, warm water blue, energy green */
+section.current section:nth-child(1) .measurement { --accent: var(--google-red-500); }
+section.current section:nth-child(2) .measurement { --accent: var(--google-blue-500); }
+section.current section:nth-child(3) .measurement { --accent: var(--google-green-500); }
+.icon { position: absolute; width: 1.8rem; height: 1.8rem; top: .8rem; }
+.measurement .icon { top: 12%; left: 50%; transform: translateX(-50%); width: 1.9rem; height: 1.9rem; }
 .unit { font-size: 1rem; }
 
 section.states { display: flex; flex-wrap: wrap; justify-content: center; gap: .8rem; margin-top: 1.2rem; }
@@ -51,6 +60,12 @@ details.info th { text-align: left; font-weight: 300; opacity: .7; padding: .15r
 #status summary::-webkit-details-marker { display: none; }
 .badge { padding: .3rem .8rem; border-radius: 1rem; background: var(--panel); font-size: .9rem; }
 .badge.ok::before, .badge.bad::before { content: '●'; margin-right: .4rem; }
+/* live indicator: the dot and a soft ring pulse slowly while the poller runs */
+.badge.ok { animation: ring 2.4s ease-out infinite; }
+.badge.ok::before { display: inline-block; animation: beat 2.4s ease-in-out infinite; }
+@keyframes beat { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.75); } }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(42, 170, 119, .45); } 70%, 100% { box-shadow: 0 0 0 .6rem rgba(42, 170, 119, 0); } }
+@media (prefers-reduced-motion: reduce) { .badge.ok, .badge.ok::before { animation: none; } }
 .ok { color: #2a7; }
 .bad { color: #c33; }
 #st-body { position: absolute; z-index: 10; left: 0; top: 2.2rem; width: min(34rem, 90vw); font-size: .85rem; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
