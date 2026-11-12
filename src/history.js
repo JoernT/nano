@@ -1,6 +1,7 @@
 // Read-only history for the report page (src/report.html): queries InfluxDB so the browser never needs a token.
 import {InfluxDB} from '@influxdata/influxdb-client';
 import {readFileSync} from 'node:fs';
+import {loadCorrections, kwhByDay, wattsAt, phantomInDisplayMonth} from './corrections.js';
 import {dayStartMs, compressorHz, detectCycles, dailyStats, summary, pearson, heatingDegreeDays, phaseStats, TZ} from './cycles.js';
 
 // energy per day against the daily mean outdoor temperature
@@ -120,6 +121,8 @@ export function createHistory(config) {
             importDaily: perDay(dayRows[2]),
             exportDaily: perDay(dayRows[3]),
         };
+        const corrections = loadCorrections();
+        const phantom = kwhByDay(corrections); // booster heater power the unit reports but that does not flow (src/corrections.json)
         const totalsData = await totalsRows;
         const energyTotals = (() => {
             const months = new Map();
@@ -128,7 +131,7 @@ export function createHistory(config) {
                 if (!(r._value >= 0)) continue; // counter reset
                 const day = new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ});
                 const m = months.get(day.slice(0, 7)) || months.set(day.slice(0, 7), {month: day.slice(0, 7), kwh: 0, days: 0}).get(day.slice(0, 7));
-                m.kwh += r._value; m.days++;
+                m.kwh += Math.max(0, r._value - (phantom.get(day) || 0)); m.days++;
             }
             const round = (o) => ({...o, kwh: Math.round(o.kwh * 10) / 10});
             // one row per month: the display value (full month) wins over our own, possibly partial, measurement
@@ -136,7 +139,10 @@ export function createHistory(config) {
             const rows = new Map([...months.values()].map((m) => [m.month, {month: m.month, consumed: round(m).kwh, days: m.days, source: 'gemessen'}]));
             for (const [month, v] of Object.entries(manual)) {
                 const row = rows.get(month) || rows.set(month, {month}).get(month);
-                if (Number.isFinite(v.consumed)) Object.assign(row, {consumed: v.consumed, days: undefined, source: 'Display'});
+                if (Number.isFinite(v.consumed)) {
+                    const ph = Math.round(phantomInDisplayMonth(corrections, month, v.asOf) * 10) / 10; // the display counts the booster heater that does not run
+                    Object.assign(row, {consumed: Math.round((v.consumed - ph) * 10) / 10, days: undefined, source: 'Display', heaterKwh: ph || undefined});
+                }
                 if (Number.isFinite(v.produced)) row.produced = v.produced;
             }
             const list = [...rows.values()].sort((a, b) => a.month.localeCompare(b.month));
@@ -184,7 +190,7 @@ export function createHistory(config) {
             .map((r) => ({t: Date.parse(r._time), hz: compressorHz(r._value)}))
             .filter((s) => s.hz !== undefined);
         const runs = detectCycles(samples);
-        const kwh = new Map(energyRows.map((r) => [new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ}), Math.round(r._value * 10) / 10]));
+        const kwh = new Map(energyRows.map((r) => [new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ}), Math.round(Math.max(0, r._value - (phantom.get(new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ})) || 0)) * 10) / 10]));
         const outByDay = new Map();
         for (const r of outdoorHourly) {
             const k = new Date(Date.parse(r._time) - 1).toLocaleDateString('sv-SE', {timeZone: TZ});
@@ -239,7 +245,7 @@ export function createHistory(config) {
                 flowVsOutdoor: pearson(curve),
                 ...dailyCorrelation(daily),
             },
-            power: pairs(power),
+            power: pairs(power).map(([t, w]) => [t, Math.max(0, w - wattsAt(corrections, t))]),
             solar,
             hz: samples.map((s) => [s.t, s.hz]),
             runs,

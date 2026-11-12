@@ -31,3 +31,4 @@ table.totals th:first-child { width: 40%; }
 [hidden] { display: none !important; }
 .bar nav#views { margin-left: 0; }
 .reminder { background: var(--panel); border-left: 4px solid #e4572e; border-radius: .4rem; padding: .6rem .8rem; color: var(--fg); }
+.tank-key { border-left: .7rem solid #f2a54180; padding-left: .3rem; }

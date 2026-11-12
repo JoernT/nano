@@ -5,7 +5,17 @@ const API = '/api/history';
 const GROUP = 'nano'; // same group = synchronised zoom and tooltip
 const charts = {};
 let view = {}; // selected window and experiments
-const expAnnotations = () => (view.experiments || []).filter((e) => e.at >= view.min).map((e) => ({x: e.at, borderColor: '#76b041', strokeDashArray: 3, label: {text: e.label, orientation: 'horizontal', textAnchor: 'end', position: 'top', offsetX: -4, style: {color: '#fff', background: '#76b041'}}})); // selected time window, so every time chart spans it even where there is no data
+// warm water phases (diverter valve on "tank") as light orange bands in every time chart
+const tankBands = () => {
+    const pts = view.valve || [];
+    return pts.flatMap(([t, v], i) => {
+        if (v !== 'tank') return [];
+        const x = Math.max(t, view.min), x2 = Math.min(pts[i + 1]?.[0] ?? view.max, view.max);
+        return x2 > x ? [{x, x2, fillColor: '#f2a541', opacity: 0.16, borderColor: 'transparent'}] : [];
+    });
+};
+const expAnnotations = () => [...tankBands(), ...expLines()];
+const expLines = () => (view.experiments || []).filter((e) => e.at >= view.min).map((e) => ({x: e.at, borderColor: '#76b041', strokeDashArray: 3, label: {text: e.label, orientation: 'horizontal', textAnchor: 'end', position: 'top', offsetX: -4, style: {color: '#fff', background: '#76b041'}}})); // selected time window, so every time chart spans it even where there is no data
 const COLORS = ['#e4572e', '#2e86ab', '#76b041', '#a23b72', '#f2a541', '#6c757d'];
 const STATE_LABELS = {mode: 'Heizmodus', diverterValve: 'Ventil', defrost: 'Abtauen'};
 const STATE_COLORS = {auto: '#2e86ab', heat: '#e4572e', cool: '#76b041', room: '#6c757d', tank: '#f2a541', on: '#e4572e', off: '#d6d9dc'};
@@ -211,7 +221,7 @@ function renderTotals(h) {
     const cell = (x, d = 1) => (x === undefined ? '–' : fmt(x, d));
     const head = (label, last) => `<thead><tr><th>${label}</th><th>Strom kWh</th><th>Wärme kWh</th><th>COP</th><th>${last}</th></tr></thead>`;
     const years = t.years.slice().reverse().map((y) => `<tr><td>${y.year}</td><td>${cell(y.consumed)}</td><td>${cell(y.produced, 0)}</td><td>${cell(y.cop, 2)}</td><td>${y.months} ${y.months === 1 ? "Monat" : "Monate"}</td></tr>`).join('');
-    const months = t.months.slice().reverse().map((m) => `<tr><td>${m.month}</td><td>${cell(m.consumed)}</td><td>${cell(m.produced, 0)}</td><td>${cell(m.cop, 2)}</td><td>${m.source === 'Display' ? 'Display' : `gemessen, ${m.days} Tage`}</td></tr>`).join('');
+    const months = t.months.slice().reverse().map((m) => `<tr><td>${m.month}</td><td>${cell(m.consumed)}</td><td>${cell(m.produced, 0)}</td><td>${cell(m.cop, 2)}</td><td>${m.source === 'Display' ? `Display${m.heaterKwh ? ` <small>(−${fmt(m.heaterKwh, 1)} kWh Heizstab-Anzeige)</small>` : ''}` : `gemessen, ${m.days} Tage`}</td></tr>`).join('');
     // reminder: the display values (src/energy-history.json) are typed in by hand, ask for new ones every 6 months
     const lastDisplay = t.months.filter((m) => m.source === 'Display').map((m) => m.month).pop();
     const now = new Date(h.to);
@@ -301,9 +311,9 @@ function allSeriesTooltip({series, dataPointIndex, w}) {
         + rows.map(([n, v, c]) => `<div><i style="display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:${c};margin-right:.4rem"></i>${n}: <b>${Number(v).toFixed(1)} °C</b></div>`).join('') + '</div>';
 }
 
-async function load(range) {
+async function load(range, quiet = false) {
     const msg = document.getElementById('msg');
-    msg.textContent = 'lade …';
+    if (!quiet) msg.textContent = 'lade …';
     let h;
     try {
         const r = await fetch(`${API}?range=${range}`);
@@ -313,12 +323,13 @@ async function load(range) {
         msg.textContent = `Fehler beim Laden: ${e.message} (läuft der Poller auf Port 8787?)`;
         return;
     }
-    view = {min: h.from, max: h.to, experiments: h.experiments};
+    view = {min: h.from, max: h.to, experiments: h.experiments, valve: h.states?.diverterValve};
     const firsts = [h.hz, h.power, ...Object.values(h.rooms), ...Object.values(h.temps)].map((pts) => pts?.[0]?.[0]).filter((t) => t !== undefined);
     const first = firsts.length ? Math.min(...firsts) : null;
     const f = (t) => new Date(t).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
     const gap = first && first - h.from > 3600_000;
     document.getElementById('range-info').innerHTML = `Zeitraum ${f(h.from)} – ${f(h.to)}`
+        + ' · <span class="tank-key">orange = Warmwasserbereitung</span>'
         + (!first ? ' · <b class="warn">keine Daten</b>' : gap ? ` · <b class="warn">Daten erst ab ${f(first)}</b> (davor leer)` : '');
     msg.textContent = `Stand ${new Date(h.to).toLocaleString('de-DE')}`;
     renderTiles(h);
@@ -437,3 +448,13 @@ try {
 } catch {}
 showView(saved);
 load(range);
+
+// keep the page current: the poller writes every 4 minutes, so refresh charts and the live values every 2 minutes
+// while the tab is visible, and right away when it becomes visible again
+function autoRefresh() {
+    if (document.visibilityState !== 'visible') return;
+    load(range, true);
+    document.getElementById('s-load-current')?.submit?.(); // live values of the Fore page (a click on the trigger does not fire from script)
+}
+setInterval(autoRefresh, 120_000);
+document.addEventListener('visibilitychange', autoRefresh);

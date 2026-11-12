@@ -97,7 +97,7 @@
         </details>
         <section class="states">
             <div class="chip" data-state="{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}"><span class="label">Modus</span><span class="value">{instance('response')?components?INDOOR2?airConditionerMode?airConditionerMode?value}</span></div>
-            <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}"><span class="label">Ventil</span><span class="value">{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}</span></div>
+            <div class="chip" data-state="{instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value}"><span class="label">Betrieb</span><span class="value">{if(instance('response')?components?main?('samsungce.ehsDiverterValve')?position?value = 'tank') then 'Warmwasser' else 'Heizung'}</span></div>
             <div class="chip" data-state="{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}"><span class="label">Abtauen</span><span class="value">{instance('response')?components?INDOOR2?('samsungce.ehsDefrostMode')?status?value}</span></div>
         </section>
         <fx-trigger class="reload">
