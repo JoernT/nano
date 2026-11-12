@@ -93,7 +93,7 @@ export function createHistory(config) {
         ]);
         // solar (Growatt, optional: empty when GROWATT_TOKEN is not set): continuous series, radiation from Open-Meteo,
         // yield per day = highest "today" counter of each local day
-        const SOLAR_FIELDS = ['pv_w', 'load_w', 'soc', 'grid_import_w', 'grid_export_w', 'charge_w', 'discharge_w'];
+        const SOLAR_FIELDS = ['pv_w', 'pv1_w', 'pv2_w', 'load_w', 'soc', 'grid_import_w', 'grid_export_w', 'charge_w', 'discharge_w'];
         const [solarRows, radiationRows, pvDayRows] = await Promise.all([
             Promise.all(SOLAR_FIELDS.map((f) => mean('solar', f))),
             mean('weather', 'radiation'),

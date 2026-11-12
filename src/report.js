@@ -74,27 +74,29 @@ function renderSolar(h) {
         const bm = new Map((b || []).map(([t, v]) => [t, v]));
         return (a || []).map(([t, v]) => [t, Math.round(v - (bm.get(t) ?? 0))]);
     };
+    // one entry per series; the two roof strings only appear once they have been recorded
+    const strings = (sol.pv1_w || []).length > 0;
+    const specs = [
+        {name: 'PV (W)', type: 'area', data: sol.pv_w || [], width: 1, opacity: 0.25, dash: 0},
+        ...(strings ? [
+            {name: 'String 1 (W)', type: 'line', data: sol.pv1_w, width: 1.5, opacity: 1, dash: 2},
+            {name: 'String 2 (W)', type: 'line', data: sol.pv2_w || [], width: 1.5, opacity: 1, dash: 2},
+        ] : []),
+        {name: 'Verbrauch Haus (W)', type: 'line', data: sol.load_w || [], width: 2, opacity: 1, dash: 0},
+        {name: 'Netz (W, + Bezug / − Einspeisung)', type: 'line', data: net(sol.grid_import_w, sol.grid_export_w), width: 2, opacity: 1, dash: 0},
+        {name: 'Batterie (W, + laden / − entladen)', type: 'line', data: net(sol.charge_w, sol.discharge_w), width: 2, opacity: 1, dash: 0},
+        {name: 'Einstrahlung (W/m²)', type: 'line', data: sol.radiation || [], width: 2, opacity: 1, dash: 4},
+        {name: 'Batterie-Ladestand (%)', type: 'line', data: sol.soc || [], width: 2, opacity: 1, dash: 0, percent: true},
+    ];
     draw('c-solar', {
         ...base({chart: {type: 'line'}, rest: {}}),
-        series: [
-            {name: 'PV (W)', type: 'area', data: sol.pv_w || []},
-            {name: 'Verbrauch Haus (W)', type: 'line', data: sol.load_w || []},
-            {name: 'Netz (W, + Bezug / − Einspeisung)', type: 'line', data: net(sol.grid_import_w, sol.grid_export_w)},
-            {name: 'Batterie (W, + laden / − entladen)', type: 'line', data: net(sol.charge_w, sol.discharge_w)},
-            {name: 'Einstrahlung (W/m²)', type: 'line', data: sol.radiation || []},
-            {name: 'Batterie-Ladestand (%)', type: 'line', data: sol.soc || []},
-        ],
-        stroke: {width: [1, 2, 2, 2, 2, 2], curve: 'smooth', dashArray: [0, 0, 0, 0, 4, 0]},
-        fill: {opacity: [0.25, 1, 1, 1, 1, 1]},
+        series: specs.map(({name, type, data}) => ({name, type, data})),
+        stroke: {width: specs.map((x) => x.width), curve: 'smooth', dashArray: specs.map((x) => x.dash)},
+        fill: {opacity: specs.map((x) => x.opacity)},
         ...((view.max - view.min) <= 25 * 3600_000 ? {xaxis: {...base({chart: {}, rest: {}}).xaxis, tickAmount: Math.round((view.max - view.min) / 3600_000), labels: {datetimeUTC: false, format: 'HH:mm', rotate: -45, rotateAlways: true}}} : {}),
-        yaxis: [
-            {seriesName: 'PV (W)', title: {text: 'W'}, decimalsInFloat: 0},
-            {seriesName: 'PV (W)', show: false},
-            {seriesName: 'PV (W)', show: false},
-            {seriesName: 'PV (W)', show: false},
-            {seriesName: 'PV (W)', show: false},
-            {opposite: true, min: 0, max: 100, title: {text: '%'}, decimalsInFloat: 0},
-        ],
+        // everything in W shares the first axis, the battery level has its own (0-100 %)
+        yaxis: specs.map((x, i) => (x.percent ? {opposite: true, min: 0, max: 100, title: {text: '%'}, decimalsInFloat: 0}
+            : i === 0 ? {seriesName: 'PV (W)', title: {text: 'W'}, decimalsInFloat: 0} : {seriesName: 'PV (W)', show: false})),
     });
 }
 
