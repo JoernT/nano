@@ -103,6 +103,40 @@ function renderSolar(h) {
     });
 }
 
+// daily balance of the plant: PV yield, house consumption, grid import and export per local day (kWh)
+function renderSolarDay(h) {
+    const sol = h.solar || {};
+    const days = [...new Set([sol.pvDaily, sol.loadDaily, sol.importDaily, sol.exportDaily].flatMap((a) => (a || []).map(([d]) => d)))].sort();
+    const col = (name, pts, color) => {
+        const m = new Map(pts || []);
+        return {name, type: 'column', data: days.map((d) => m.get(d) ?? null), color};
+    };
+    const specs = [
+        col('PV-Ertrag', sol.pvDaily, '#f2a900'),
+        col('Verbrauch Haus', sol.loadDaily, '#4c78d0'),
+        col('Netzbezug', sol.importDaily, '#d1495b'),
+        col('Einspeisung', sol.exportDaily, '#3fa34d'),
+    ];
+    if (!days.length) {
+        charts['c-solar-day']?.destroy();
+        delete charts['c-solar-day'];
+        document.getElementById('c-solar-day').innerHTML = '<p class="msg">Noch keine Tageswerte.</p>';
+        return;
+    }
+    document.getElementById('c-solar-day').innerHTML = '';
+    draw('c-solar-day', {
+        ...base({chart: {type: 'bar', group: undefined, height: 280}, rest: {}}),
+        series: specs.map(({name, type, data}) => ({name, type, data})),
+        colors: specs.map((x) => x.color),
+        xaxis: {categories: days},
+        annotations: {},
+        stroke: {width: 0},
+        plotOptions: {bar: {columnWidth: '75%'}},
+        yaxis: {title: {text: 'kWh'}, decimalsInFloat: 0},
+        tooltip: {shared: true, intersect: false, y: {formatter: (v) => (v === null || v === undefined ? '–' : `${Number(v).toFixed(1)} kWh`)}},
+    });
+}
+
 function renderHdd(h) {
     const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Berlin'});
     const rows = h.daily.filter((d) => d.day !== today);
@@ -353,6 +387,7 @@ async function load(range) {
     renderHdd(h);
     renderTrend(h);
     renderSolar(h);
+    renderSolarDay(h);
     renderTotals(h);
     renderPhases(h);
     renderStates(h);
