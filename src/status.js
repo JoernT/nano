@@ -14,6 +14,11 @@ async function refresh() {
         const s = await (await fetch('/status.json')).json();
         if (lastPoll && s.lastPollAt !== lastPoll) window.dispatchEvent(new Event('nano-polled')); // new values: the page reloads its charts and live values
         lastPoll = s.lastPollAt;
+        const w = document.getElementById('tank-warn');
+        if (w) {
+            w.hidden = !s.tankWarning;
+            if (s.tankWarning) w.textContent = `Warmwasser nur ${Math.round(s.tankWarning.temp * 10) / 10} °C: seit ${new Date(s.tankWarning.lastTank).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} kein Aufheizen. Modus wechseln oder Boost starten.`;
+        }
         const v = s.values || {};
         badge.textContent = `nano ${s.state}`;
         badge.className = `badge ${s.state === 'running' ? 'ok' : 'bad'}`;

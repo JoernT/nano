@@ -28,7 +28,7 @@ Node 20 and npm come from apt (`sudo apt install nodejs npm`).
 ```sh
 npm run build                      # page -> dist/
 rsync -a --delete dist/ jwt@nano:nano/dist/   # or: ssh jwt@nano 'rm -rf nano/dist' && scp -r dist jwt@nano:nano/dist
-scp src/nano.js src/history.js src/weather.js src/smartthings-auth.js src/cycles.js src/growatt.js src/rooms.json src/experiments.json src/energy-history.json jwt@nano:nano/src/
+scp src/nano.js src/history.js src/weather.js src/smartthings-auth.js src/cycles.js src/growatt.js src/tankwatch.js src/corrections.js src/corrections.json src/rooms.json src/experiments.json src/energy-history.json jwt@nano:nano/src/
 ssh -t jwt@nano 'sudo systemctl restart nano-poller'   # only needed when the .js files changed; dist/ is read on every request
 ```
 
@@ -67,6 +67,9 @@ Copy the file to the Pi (see Update) and restart the poller; the report shows it
 ## Solar (Growatt inverter + battery)
 
 Optional. Put `GROWATT_TOKEN=<OpenAPI token>` (and optionally `GROWATT_SN=<inverter serial>`, otherwise the first storage device of the account is used) into `~/nano/.env` and restart the poller.
+
+### Push for the warm water stall warning
+Optional. Put `NTFY_URL=https://ntfy.sh/<secret-topic>` into `~/nano/.env` (pick a hard-to-guess topic, subscribe to it in the ntfy app) and restart the poller. Without it the page banner still shows the warning.
 It then reads `device/mix/mix_last_data` every 5 minutes (the API rate-limits: error 10012) and writes the `solar` measurement (PV, load, grid import/export, battery charge/discharge, SOC, day counters); hourly irradiation comes in with the weather points.
 Check what the plant offers: `ssh jwt@nano 'cd nano && node --env-file=.env src/growatt.js --dry'` (takes about a minute because of the rate limit).
 

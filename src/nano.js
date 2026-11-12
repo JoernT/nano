@@ -6,6 +6,7 @@
 //   INFLUX_URL          default http://localhost:8086
 //   INFLUX_TOKEN, INFLUX_ORG (default nanoCorp), INFLUX_BUCKET (default nano)
 //   POLL_INTERVAL_SEC   default 240
+//   NTFY_URL            optional: push for the warm water stall warning, e.g. https://ntfy.sh/<secret-topic>
 //   GROWATT_TOKEN       optional: Growatt OpenAPI token, enables the solar series; GROWATT_SN the inverter serial (found automatically if unset)
 // If SMARTTHINGS_* / INFLUX_TOKEN are unset, the legacy src/config.js is used as a fallback.
 //
@@ -22,6 +23,7 @@ import {createHistory, RANGES} from './history.js';
 import {fetchOutdoor} from './weather.js';
 import {fetchMix, findStorageSn} from './growatt.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
+import {evaluate, notify} from './tankwatch.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -323,6 +325,28 @@ export async function startPolling(config) {
     const note = (msg) => { status.events.unshift(`${new Date().toLocaleTimeString()}  ${msg}`); status.events.length = Math.min(status.events.length, 15); };
     const server = startStatusServer(config, status);
 
+    // warm water stall watch (src/tankwatch.js): seed the last tank cycle from the last 24 h so restarts do not reset the timer
+    let tank = {};
+    try {
+        const rows = await influx.getQueryApi(config.influx.org).collectRows(`from(bucket: "${config.influx.bucket}") |> range(start: -24h) |> filter(fn: (r) => r._measurement == "state" and r.component == "warmwater" and r.attribute == "diverterValve" and r._value == "tank") |> last()`);
+        const t = rows.map((r) => Date.parse(r._time)).filter(Number.isFinite);
+        if (t.length) tank.lastTank = Math.max(...t);
+    } catch (e) { log('tank watch seed failed:', e.message); }
+    const watchTank = (points) => {
+        const temp = points.find((x) => x.measurement === 'temperature' && x.tags.component === 'warmwater')?.fields.temp;
+        const valve = points.find((x) => x.measurement === 'state' && x.tags.component === 'warmwater' && x.tags.attribute === 'diverterValve')?.fields.value;
+        if (typeof temp !== 'number') return;
+        tank = evaluate(tank, {temp, valve});
+        status.tankWarning = tank.warning ? {since: new Date(tank.warning.since).toISOString(), lastTank: new Date(tank.lastTank).toISOString(), temp} : null;
+        if (!tank.event) return;
+        const msg = tank.event === 'start'
+            ? `Warmwasser nur ${temp.toFixed(1)} °C, seit ${new Date(tank.lastTank).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} kein Aufheizen. Modus wechseln oder Boost.`
+            : `Warmwasser wieder ${temp.toFixed(1)} °C.`;
+        log('tank watch:', msg);
+        note(`Tank: ${msg}`);
+        notify(tank.event === 'start' ? 'Warmwasser stockt' : 'Warmwasser ok', msg).catch((e) => log('push failed:', e.message));
+    };
+
     let running = false;
     const poll = async () => {
         if (running) return log('previous poll still running, skipping');
@@ -332,6 +356,7 @@ export async function startPolling(config) {
             const points = extractPoints(data);
             status.values = summarize(points);
             status.latestRaw = data;
+            watchTank(points);
             for (const p of points) {
                 const pt = new Point(p.measurement);
                 for (const [k, val] of Object.entries(p.tags)) pt.tag(k, val);
