@@ -91,6 +91,24 @@ export function createHistory(config) {
             hourly('temperature', 'and r.component == "heating"'),
             tempsBefore,
         ]);
+        // solar (Growatt, optional: empty when GROWATT_TOKEN is not set): continuous series, radiation from Open-Meteo,
+        // yield per day = highest "today" counter of each local day
+        const SOLAR_FIELDS = ['pv_w', 'load_w', 'soc', 'grid_import_w', 'grid_export_w', 'charge_w', 'discharge_w'];
+        const [solarRows, radiationRows, pvDayRows] = await Promise.all([
+            Promise.all(SOLAR_FIELDS.map((f) => mean('solar', f))),
+            mean('weather', 'radiation'),
+            rows(`import "timezone"
+                option location = timezone.location(name: "${TZ}")
+                ${base} |> range(start: -${hours + 24}h)
+                |> filter(fn: (r) => r._measurement == "solar" and r._field == "pv_kwh_today")
+                |> aggregateWindow(every: 1d, fn: max, createEmpty: false)`),
+        ]);
+        const solar = {
+            ...Object.fromEntries(SOLAR_FIELDS.map((f, i) => [f, pairs(solarRows[i])])),
+            radiation: pairs(radiationRows),
+            // [local day, kWh]
+            pvDaily: pvDayRows.map((r) => [new Date(Date.parse(r._time) - 12 * 3600_000).toLocaleDateString('sv-SE', {timeZone: TZ}), Math.round(r._value * 10) / 10]),
+        };
         const totalsData = await totalsRows;
         const energyTotals = (() => {
             const months = new Map();
@@ -211,6 +229,7 @@ export function createHistory(config) {
                 ...dailyCorrelation(daily),
             },
             power: pairs(power),
+            solar,
             hz: samples.map((s) => [s.t, s.hz]),
             runs,
             summary: summary(runs),

@@ -46,6 +46,58 @@ function renderTiles(h) {
     document.getElementById('summary').innerHTML = tiles.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join('');
 }
 
+function renderSolar(h) {
+    const sol = h.solar || {};
+    const hasData = (sol.pv_w || []).length > 0;
+    const panel = document.getElementById('c-solar');
+    if (!hasData) {
+        charts['c-solar']?.destroy();
+        delete charts['c-solar'];
+        document.getElementById('solar-tiles').innerHTML = '';
+        panel.innerHTML = '<p class="msg">Noch keine Solardaten (GROWATT_TOKEN auf dem Pi setzen).</p>';
+        return;
+    }
+    panel.innerHTML = '';
+    const last = (pts) => pts?.length ? pts[pts.length - 1][1] : undefined;
+    const todayKey = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Berlin'});
+    const today = (sol.pvDaily || []).find(([d]) => d === todayKey)?.[1];
+    const sum = (sol.pvDaily || []).reduce((a, [, v]) => a + v, 0);
+    const tiles = [
+        [fmt(last(sol.pv_w), 0) + ' W', 'PV jetzt'],
+        [fmt(last(sol.soc), 0) + ' %', 'Batterie'],
+        [today !== undefined ? fmt(today) + ' kWh' : '–', 'PV heute'],
+        [(sol.pvDaily || []).length ? fmt(sum) + ' kWh' : '–', 'PV im Zeitraum'],
+    ];
+    document.getElementById('solar-tiles').innerHTML = tiles.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join('');
+    // battery power: charging positive, discharging negative; grid: import positive, export negative
+    const net = (a, b) => {
+        const bm = new Map((b || []).map(([t, v]) => [t, v]));
+        return (a || []).map(([t, v]) => [t, Math.round(v - (bm.get(t) ?? 0))]);
+    };
+    draw('c-solar', {
+        ...base({chart: {type: 'line'}, rest: {}}),
+        series: [
+            {name: 'PV (W)', type: 'area', data: sol.pv_w || []},
+            {name: 'Verbrauch Haus (W)', type: 'line', data: sol.load_w || []},
+            {name: 'Netz (W, + Bezug / − Einspeisung)', type: 'line', data: net(sol.grid_import_w, sol.grid_export_w)},
+            {name: 'Batterie (W, + laden / − entladen)', type: 'line', data: net(sol.charge_w, sol.discharge_w)},
+            {name: 'Einstrahlung (W/m²)', type: 'line', data: sol.radiation || []},
+            {name: 'Batterie-Ladestand (%)', type: 'line', data: sol.soc || []},
+        ],
+        stroke: {width: [1, 2, 2, 2, 2, 2], curve: 'smooth', dashArray: [0, 0, 0, 0, 4, 0]},
+        fill: {opacity: [0.25, 1, 1, 1, 1, 1]},
+        ...((view.max - view.min) <= 25 * 3600_000 ? {xaxis: {...base({chart: {}, rest: {}}).xaxis, tickAmount: Math.round((view.max - view.min) / 3600_000), labels: {datetimeUTC: false, format: 'HH:mm', rotate: -45, rotateAlways: true}}} : {}),
+        yaxis: [
+            {seriesName: 'PV (W)', title: {text: 'W'}, decimalsInFloat: 0},
+            {seriesName: 'PV (W)', show: false},
+            {seriesName: 'PV (W)', show: false},
+            {seriesName: 'PV (W)', show: false},
+            {seriesName: 'PV (W)', show: false},
+            {opposite: true, min: 0, max: 100, title: {text: '%'}, decimalsInFloat: 0},
+        ],
+    });
+}
+
 function renderHdd(h) {
     const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Berlin'});
     const rows = h.daily.filter((d) => d.day !== today);
@@ -284,6 +336,7 @@ async function load(range) {
     });
     renderHdd(h);
     renderTrend(h);
+    renderSolar(h);
     renderTotals(h);
     renderPhases(h);
     renderStates(h);

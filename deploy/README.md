@@ -14,7 +14,7 @@ The poller (`src/nano.js`) runs on the Pi as a systemd service next to InfluxDB 
 ```
 ~/nano/.env            # secrets (chmod 600), INFLUX_URL=http://localhost:8086
 ~/nano/package.json    # {"type": "module"} + axios, openmeteo, @influxdata/influxdb-client
-~/nano/src/            # nano.js history.js weather.js smartthings-auth.js cycles.js rooms.json experiments.json energy-history.json
+~/nano/src/            # nano.js history.js weather.js smartthings-auth.js cycles.js growatt.js rooms.json experiments.json energy-history.json
 ~/nano/dist/           # built page (npm run build), served by nano.js
 ~/nano/src/room-sensors.py, ~/nano/requirements-ble.txt, ~/nano/.venv/   # room sensors (python3 -m venv .venv && .venv/bin/pip install -r requirements-ble.txt)
 ```
@@ -28,7 +28,7 @@ Node 20 and npm come from apt (`sudo apt install nodejs npm`).
 ```sh
 npm run build                      # page -> dist/
 rsync -a --delete dist/ jwt@nano:nano/dist/   # or: ssh jwt@nano 'rm -rf nano/dist' && scp -r dist jwt@nano:nano/dist
-scp src/nano.js src/history.js src/weather.js src/smartthings-auth.js src/cycles.js src/rooms.json src/experiments.json src/energy-history.json jwt@nano:nano/src/
+scp src/nano.js src/history.js src/weather.js src/smartthings-auth.js src/cycles.js src/growatt.js src/rooms.json src/experiments.json src/energy-history.json jwt@nano:nano/src/
 ssh -t jwt@nano 'sudo systemctl restart nano-poller'   # only needed when the .js files changed; dist/ is read on every request
 ```
 
@@ -63,6 +63,12 @@ They fill the months before recording began and add the heat output, which is no
 
 A display value wins over our own measurement for the same month (ours is partial for the first and the current month).
 Copy the file to the Pi (see Update) and restart the poller; the report shows it right away.
+
+## Solar (Growatt inverter + battery)
+
+Optional. Put `GROWATT_TOKEN=<OpenAPI token>` (and optionally `GROWATT_SN=<inverter serial>`, otherwise the first storage device of the account is used) into `~/nano/.env` and restart the poller.
+It then reads `device/mix/mix_last_data` every 5 minutes (the API rate-limits: error 10012) and writes the `solar` measurement (PV, load, grid import/export, battery charge/discharge, SOC, day counters); hourly irradiation comes in with the weather points.
+Check what the plant offers: `ssh jwt@nano 'cd nano && node --env-file=.env src/growatt.js --dry'` (takes about a minute because of the rate limit).
 
 ## Room sensors and Bluetooth range
 

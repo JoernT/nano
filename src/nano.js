@@ -6,6 +6,7 @@
 //   INFLUX_URL          default http://localhost:8086
 //   INFLUX_TOKEN, INFLUX_ORG (default nanoCorp), INFLUX_BUCKET (default nano)
 //   POLL_INTERVAL_SEC   default 240
+//   GROWATT_TOKEN       optional: Growatt OpenAPI token, enables the solar series; GROWATT_SN the inverter serial (found automatically if unset)
 // If SMARTTHINGS_* / INFLUX_TOKEN are unset, the legacy src/config.js is used as a fallback.
 //
 // Every point carries the timestamp the *device* reported, not the poll time. Writing the same
@@ -19,6 +20,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createHistory, RANGES} from './history.js';
 import {fetchOutdoor} from './weather.js';
+import {fetchMix, findStorageSn} from './growatt.js';
 import {SmartThingsAuth} from './smartthings-auth.js';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -363,6 +365,7 @@ export async function startPolling(config) {
             for (const w of rows) {
                 const pt = new Point('weather').tag('source', 'open-meteo').floatField('temp', w.temp).timestamp(new Date(w.time));
                 if (w.humidity !== undefined) pt.floatField('humidity', w.humidity);
+                if (w.radiation !== undefined) pt.floatField('radiation', w.radiation);
                 writeApi.writePoint(pt);
             }
             await writeApi.flush();
@@ -373,13 +376,34 @@ export async function startPolling(config) {
         }
     };
 
+    // solar (optional): Growatt hybrid inverter + battery, only when GROWATT_TOKEN is set; the API rate-limits, so every 5 min
+    let growattSn = process.env.GROWATT_SN;
+    const pollSolar = async () => {
+        const token = process.env.GROWATT_TOKEN;
+        if (!token) return;
+        try {
+            growattSn ||= await findStorageSn(token);
+            const {time, fields} = await fetchMix(token, growattSn);
+            const pt = new Point('solar').tag('source', 'growatt').timestamp(new Date(time));
+            for (const [k, v] of Object.entries(fields)) pt.floatField(k, v);
+            writeApi.writePoint(pt);
+            await writeApi.flush();
+            log(`solar: pv ${fields.pv_w} W, battery ${fields.soc}%`);
+        } catch (e) {
+            log('solar failed:', e.message);
+        }
+    };
+
     await poll();
     pollWeather();
+    pollSolar();
     const timer = setInterval(poll, config.intervalMs);
     const weatherTimer = setInterval(pollWeather, 3600_000);
+    const solarTimer = setInterval(pollSolar, 300_000);
     const shutdown = async () => {
         clearInterval(timer);
         clearInterval(weatherTimer);
+        clearInterval(solarTimer);
         server?.close();
         try { await writeApi.close(); } catch (e) { log('flush on shutdown failed:', e.message); }
         process.exit(0);
