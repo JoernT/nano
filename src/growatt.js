@@ -43,7 +43,8 @@ export function parseMix(json) {
     const f = {
         pv_w: d.ppv, charge_w: d.pcharge1, discharge_w: d.pdischarge1, soc: d.soc ?? d.bmsSOC,
         grid_import_w: d.pacToUserR, grid_export_w: d.pacToGridR, load_w: d.plocalLoadR,
-        pv_kwh_today: d.epvtoday, load_kwh_today: d.elocalLoadToday, import_kwh_today: d.etoUserToday, export_kwh_today: d.etoGridToday,
+        pv1_w: d.ppv1, pv2_w: d.ppv2, ac_charge_w: d.acChargePower, // per roof string; battery charging from the grid
+        pv_kwh_today: d.epvtoday, pv1_kwh_today: d.epv1Today, pv2_kwh_today: d.epv2Today, ac_charge_kwh_today: d.acChargeEnergyToday, load_kwh_today: d.elocalLoadToday, import_kwh_today: d.etoUserToday, export_kwh_today: d.etoGridToday,
     };
     return {time, fields: Object.fromEntries(Object.entries(f).filter(([, v]) => num(v) !== undefined))};
 }
