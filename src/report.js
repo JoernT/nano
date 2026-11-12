@@ -46,6 +46,9 @@ function renderTiles(h) {
     document.getElementById('summary').innerHTML = tiles.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join('');
 }
 
+// start of the plant's lifetime counter: creation date of the plant at Growatt (plant/list)
+const PV_SINCE = '22.11.2023';
+
 function renderSolar(h) {
     const sol = h.solar || {};
     const hasData = (sol.pv_w || []).length > 0;
@@ -67,6 +70,7 @@ function renderSolar(h) {
         [fmt(last(sol.soc), 0) + ' %', 'Batterie'],
         [today !== undefined ? fmt(today) + ' kWh' : '–', 'PV heute'],
         [(sol.pvDaily || []).length ? fmt(sum) + ' kWh' : '–', 'PV im Zeitraum'],
+        [sol.pvTotal !== undefined ? Math.round(sol.pvTotal).toLocaleString('de-DE') + ' kWh' : '–', `PV gesamt seit ${PV_SINCE}`],
     ];
     document.getElementById('solar-tiles').innerHTML = tiles.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join('');
     // battery power: charging positive, discharging negative; grid: import positive, export negative
@@ -356,12 +360,20 @@ async function load(range) {
 }
 
 let range = '24h';
+try {
+    const r = localStorage.getItem('nano-range');
+    if (['24h', '7d', '30d'].includes(r)) range = r;
+} catch {}
 const nav = document.getElementById('ranges');
+nav.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.range === range));
 nav.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     nav.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
     range = b.dataset.range;
+    try {
+        localStorage.setItem('nano-range', range);
+    } catch {}
     load(range);
 });
 

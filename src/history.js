@@ -94,7 +94,7 @@ export function createHistory(config) {
         // solar (Growatt, optional: empty when GROWATT_TOKEN is not set): continuous series, radiation from Open-Meteo,
         // yield per day = highest "today" counter of each local day
         const SOLAR_FIELDS = ['pv_w', 'pv1_w', 'pv2_w', 'load_w', 'soc', 'grid_import_w', 'grid_export_w', 'charge_w', 'discharge_w'];
-        const [solarRows, radiationRows, pvDayRows] = await Promise.all([
+        const [solarRows, radiationRows, pvDayRows, pvTotalRows] = await Promise.all([
             Promise.all(SOLAR_FIELDS.map((f) => mean('solar', f))),
             mean('weather', 'radiation'),
             rows(`import "timezone"
@@ -102,8 +102,13 @@ export function createHistory(config) {
                 ${base} |> range(start: -${hours + 24}h)
                 |> filter(fn: (r) => r._measurement == "solar" and r._field == "pv_kwh_today")
                 |> aggregateWindow(every: 1d, fn: max, createEmpty: false)`),
+            // lifetime yield of the plant: newest value of the total counter
+            rows(`${base} |> range(start: -400d)
+                |> filter(fn: (r) => r._measurement == "solar" and r._field == "pv_kwh_total")
+                |> last()`),
         ]);
         const solar = {
+            pvTotal: pvTotalRows.length ? Math.round(pvTotalRows[pvTotalRows.length - 1]._value) : undefined,
             ...Object.fromEntries(SOLAR_FIELDS.map((f, i) => [f, pairs(solarRows[i])])),
             radiation: pairs(radiationRows),
             // [local day, kWh]
