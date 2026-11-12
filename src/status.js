@@ -7,10 +7,13 @@ const ago = (d) => {
 };
 const row = (label, x, unit = '') => `<tr><td>${label}</td><td>${x ? esc(typeof x.value === 'number' ? Math.round(x.value * 10) / 10 : x.value) + unit : '–'}</td><td>${x?.at ? ago(x.at) : ''}</td></tr>`;
 
+let lastPoll;
 async function refresh() {
     const badge = document.getElementById('st-badge');
     try {
         const s = await (await fetch('/status.json')).json();
+        if (lastPoll && s.lastPollAt !== lastPoll) window.dispatchEvent(new Event('nano-polled')); // new values: the page reloads its charts and live values
+        lastPoll = s.lastPollAt;
         const v = s.values || {};
         badge.textContent = `nano ${s.state}`;
         badge.className = `badge ${s.state === 'running' ? 'ok' : 'bad'}`;

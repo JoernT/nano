@@ -449,12 +449,13 @@ try {
 showView(saved);
 load(range);
 
-// keep the page current: the poller writes every 4 minutes, so refresh charts and the live values every 2 minutes
-// while the tab is visible, and right away when it becomes visible again
+// keep the page current: refresh charts and the live values as soon as the poller has new values (status.js), while the tab
+// is visible, and right away when it becomes visible again
 function autoRefresh() {
     if (document.visibilityState !== 'visible') return;
     load(range, true);
     document.getElementById('s-load-current')?.submit?.(); // live values of the Fore page (a click on the trigger does not fire from script)
 }
-setInterval(autoRefresh, 120_000);
+window.addEventListener('nano-polled', autoRefresh); // status.js sees a new poll within 20 s
+setInterval(autoRefresh, 300_000); // fallback
 document.addEventListener('visibilitychange', autoRefresh);
