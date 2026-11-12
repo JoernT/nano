@@ -1,7 +1,7 @@
 // Read-only history for the report page (src/report.html): queries InfluxDB so the browser never needs a token.
 import {InfluxDB} from '@influxdata/influxdb-client';
 import {readFileSync} from 'node:fs';
-import {loadCorrections, kwhByDay, wattsAt, phantomInDisplayMonth} from './corrections.js';
+import {loadCorrections, kwhByDay, wattsInBucket, phantomInDisplayMonth} from './corrections.js';
 import {dayStartMs, compressorHz, detectCycles, dailyStats, summary, pearson, heatingDegreeDays, phaseStats, TZ} from './cycles.js';
 
 // energy per day against the daily mean outdoor temperature
@@ -122,6 +122,7 @@ export function createHistory(config) {
             exportDaily: perDay(dayRows[3]),
         };
         const corrections = loadCorrections();
+        const bucketMs = {'5m': 300_000, '15m': 900_000, '1h': 3600_000}[every];
         const phantom = kwhByDay(corrections); // booster heater power the unit reports but that does not flow (src/corrections.json)
         const totalsData = await totalsRows;
         const energyTotals = (() => {
@@ -245,7 +246,7 @@ export function createHistory(config) {
                 flowVsOutdoor: pearson(curve),
                 ...dailyCorrelation(daily),
             },
-            power: pairs(power).map(([t, w]) => [t, Math.max(0, w - wattsAt(corrections, t))]),
+            power: pairs(power).map(([t, w]) => [t, Math.max(0, w - wattsInBucket(corrections, t - bucketMs, t))]), // bucket = (t - every, t]
             solar,
             hz: samples.map((s) => [s.t, s.hz]),
             runs,

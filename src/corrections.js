@@ -45,3 +45,8 @@ export function phantomInDisplayMonth(corrections, month, asOf, now = Date.now()
     for (const [day, k] of kwhByDay(corrections, cap, tz)) if (day.startsWith(month)) kwh += k;
     return kwh;
 }
+
+/** watts to subtract for a chart bucket [t0, t1] (ms): every correction window that overlaps it */
+export function wattsInBucket(corrections, t0, t1, now = Date.now()) {
+    return corrections.reduce((w, c) => (t0 <= (c.to ?? now) && t1 >= c.from ? w + c.kw * 1000 : w), 0);
+}

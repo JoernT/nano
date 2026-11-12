@@ -31,3 +31,14 @@ test('display months: running month only with asOf, ended month fully', () => {
     assert.ok(Math.abs(phantomInDisplayMonth(w, '2026-11', '2026-11-13T08:00:00+01:00', now) - 12) < 1e-9);
     assert.ok(Math.abs(phantomInDisplayMonth(w, '2026-11', undefined, Date.parse('2026-12-02T00:00:00+01:00')) - 12) < 1e-9);
 });
+
+import {wattsInBucket} from '../src/corrections.js';
+
+test('chart buckets: any overlap with the window counts', () => {
+    const w = [{from: Date.parse('2026-11-12T21:56:00+01:00'), to: Date.parse('2026-11-12T23:06:00+01:00'), kw: 6}];
+    const at = (s) => Date.parse(`2026-11-12T${s}:00+01:00`);
+    assert.equal(wattsInBucket(w, at('23:05'), at('23:10')), 6000); // report stamped 23:06 sits in the bucket labelled 23:10
+    assert.equal(wattsInBucket(w, at('23:20'), at('23:25')), 0);
+    assert.equal(wattsInBucket(w, at('21:50'), at('21:55')), 0);
+    assert.equal(wattsInBucket(w, at('21:55'), at('22:00')), 6000);
+});
