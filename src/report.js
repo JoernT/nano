@@ -163,12 +163,23 @@ function renderTrend(h) {
     });
 }
 
+const REMIND_MONTHS = 6;
+
 function renderTotals(h) {
     const t = h.energyTotals || {months: [], years: []};
     const cell = (x, d = 1) => (x === undefined ? '–' : fmt(x, d));
     const head = (label, last) => `<thead><tr><th>${label}</th><th>Strom kWh</th><th>Wärme kWh</th><th>COP</th><th>${last}</th></tr></thead>`;
     const years = t.years.slice().reverse().map((y) => `<tr><td>${y.year}</td><td>${cell(y.consumed)}</td><td>${cell(y.produced, 0)}</td><td>${cell(y.cop, 2)}</td><td>${y.months} ${y.months === 1 ? "Monat" : "Monate"}</td></tr>`).join('');
     const months = t.months.slice().reverse().map((m) => `<tr><td>${m.month}</td><td>${cell(m.consumed)}</td><td>${cell(m.produced, 0)}</td><td>${cell(m.cop, 2)}</td><td>${m.source === 'Display' ? 'Display' : `gemessen, ${m.days} Tage`}</td></tr>`).join('');
+    // reminder: the display values (src/energy-history.json) are typed in by hand, ask for new ones every 6 months
+    const lastDisplay = t.months.filter((m) => m.source === 'Display').map((m) => m.month).pop();
+    const now = new Date(h.to);
+    const age = lastDisplay ? now.getFullYear() * 12 + now.getMonth() - (+lastDisplay.slice(0, 4) * 12 + +lastDisplay.slice(5, 7) - 1) : Infinity;
+    const reminder = document.getElementById('reminder');
+    reminder.hidden = age < REMIND_MONTHS;
+    reminder.textContent = lastDisplay
+        ? `Erinnerung: Die letzten Display-Werte der Wärmepumpe sind von ${lastDisplay}. Bitte Strom- und Wärmemengen der Monate seither vom Display ablesen und in src/energy-history.json nachtragen.`
+        : 'Erinnerung: Es gibt noch keine Display-Werte der Wärmepumpe (src/energy-history.json).';
     document.getElementById('totals').innerHTML = t.months.length
         ? `<table class="phases totals">${head('Jahr', 'Basis')}<tbody>${years}</tbody></table><br><table class="phases totals">${head('Monat', 'Quelle')}<tbody>${months}</tbody></table>`
         : '<p class="msg">Noch keine Energiedaten.</p>';

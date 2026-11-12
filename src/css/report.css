@@ -30,3 +30,4 @@ table.totals { table-layout: fixed; }
 table.totals th:first-child { width: 40%; }
 [hidden] { display: none !important; }
 .bar nav#views { margin-left: 0; }
+.reminder { background: var(--panel); border-left: 4px solid #e4572e; border-radius: .4rem; padding: .6rem .8rem; color: var(--fg); }
