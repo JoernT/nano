@@ -260,6 +260,8 @@ async function load(range) {
         ],
         stroke: {width: [2, 1], curve: ['smooth', 'stepline']},
         fill: {opacity: [1, 0.25]},
+        // hourly scale: one tick label per hour where the window is a day or less
+        ...((view.max - view.min) <= 25 * 3600_000 ? {xaxis: {...base({chart: {}, rest: {}}).xaxis, tickAmount: Math.round((view.max - view.min) / 3600_000), labels: {datetimeUTC: false, format: 'HH:mm', rotate: -45, rotateAlways: true}}} : {}),
         yaxis: [{title: {text: 'W'}, decimalsInFloat: 0}, {opposite: true, title: {text: 'Hz'}, decimalsInFloat: 0}],
     });
     const days = h.daily.map((d) => d.day);
