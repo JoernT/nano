@@ -1,7 +1,7 @@
 // Read-only history for the report page (src/report.html): queries InfluxDB so the browser never needs a token.
 import {InfluxDB} from '@influxdata/influxdb-client';
 import {readFileSync} from 'node:fs';
-import {compressorHz, detectCycles, dailyStats, summary, pearson, heatingDegreeDays, phaseStats, TZ} from './cycles.js';
+import {dayStartMs, compressorHz, detectCycles, dailyStats, summary, pearson, heatingDegreeDays, phaseStats, TZ} from './cycles.js';
 
 // energy per day against the daily mean outdoor temperature
 function dailyCorrelation(daily) {
@@ -172,9 +172,16 @@ export function createHistory(config) {
             }
         }
         const mean1 = (xs) => (xs?.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : undefined);
+        // mean compressor frequency per day while the compressor runs (Hz > 0)
+        const hzByDay = new Map();
+        for (const {t, hz} of samples) {
+            if (!(hz > 0)) continue;
+            const k = new Date(t).toLocaleDateString('sv-SE', {timeZone: TZ});
+            (hzByDay.get(k) || hzByDay.set(k, []).get(k)).push(hz);
+        }
         const daily = dailyStats(runs).map((d) => {
             const outdoor = mean1(outByDay.get(d.day));
-            return {...d, kwh: kwh.get(d.day), outdoor, hdd: heatingDegreeDays(outdoor), roomMean: mean1(roomByDay.get(d.day))};
+            return {...d, kwh: kwh.get(d.day), outdoor, hdd: heatingDegreeDays(outdoor), roomMean: mean1(roomByDay.get(d.day)), avgHz: mean1(hzByDay.get(d.day)), partial: dayStartMs(d.day, TZ) < (samples[0]?.t ?? 0)};
         });
         const exps = experiments();
         const phases = phaseStats(daily, exps, Date.now(), TZ, samples[0]?.t);

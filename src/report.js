@@ -63,6 +63,53 @@ function renderHdd(h) {
     });
 }
 
+// trend: rolling 7-day means of the daily values and the last 7 full days compared with the 7 before
+const METRICS = [
+    ['Starts pro Tag', (d) => d.starts, 1, -1],
+    ['Laufzeit min pro Tag', (d) => d.runMinutes, 0, 0],
+    ['Ø Laufzeit pro Start (min)', (d) => (d.starts ? d.runMinutes / d.starts : undefined), 0, 1],
+    ['Ø Verdichter-Frequenz (Hz, laufend)', (d) => d.avgHz, 1, 0],
+    ['Energie kWh pro Tag', (d) => d.kwh, 1, -1],
+    ['kWh je Gradtag', (d) => (d.kwh !== undefined && d.hdd >= 1 ? d.kwh / d.hdd : undefined), 2, -1],
+];
+const meanOf = (xs) => { const v = xs.filter((x) => x !== undefined && x !== null && !Number.isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined; };
+
+function renderTrend(h) {
+    const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Berlin'});
+    const rows = h.daily.filter((d) => d.day !== today && !d.partial); // today is running, the first day may start mid-day
+    const el = document.getElementById('trend');
+    if (rows.length < 2) { el.innerHTML = '<p class="msg">Zu wenige volle Tage für einen Trend (Zeitraum 7 oder 30 Tage wählen).</p>'; charts['c-trend']?.destroy(); return; }
+    if (rows.length < 4) {
+        el.innerHTML = `<p class="msg">Erst ${rows.length} volle Tage: der Vergleich letzte/vorherige Tage braucht mindestens 4.</p>`;
+    } else {
+        const n = Math.min(7, Math.floor(rows.length / 2));
+        const last = rows.slice(-n), prev = rows.slice(-2 * n, -n);
+        const body = METRICS.map(([label, f, dec, good]) => {
+            const a = meanOf(last.map(f)), b = meanOf(prev.map(f));
+            const pct = a !== undefined && b ? ((a - b) / b) * 100 : undefined;
+            const cls = pct === undefined || Math.abs(pct) < 5 || good === 0 ? '' : (pct * good > 0 ? 'ok' : 'bad');
+            const arrow = pct === undefined ? '' : Math.abs(pct) < 5 ? '→' : pct > 0 ? '↑' : '↓';
+            return `<tr><td>${label}</td><td>${fmt(b, dec)}</td><td>${fmt(a, dec)}</td><td class="${cls}">${arrow} ${pct === undefined ? '–' : (pct > 0 ? '+' : '') + fmt(pct, 0) + ' %'}</td></tr>`;
+        }).join('');
+        el.innerHTML = `<table class="phases totals"><thead><tr><th>Ø je Tag</th><th>vorherige ${prev.length} Tage</th><th>letzte ${last.length} Tage</th><th>Änderung</th></tr></thead><tbody>${body}</tbody></table>`;
+    }
+    const roll = (f) => rows.map((_, i) => { const v = meanOf(rows.slice(Math.max(0, i - 6), i + 1).map(f)); return v === undefined ? null : Math.round(v * 100) / 100; });
+    draw('c-trend', {
+        ...base({chart: {type: 'line', group: undefined, height: 240}, rest: {}}),
+        series: [
+            {name: 'Starts (Ø 7 T)', type: 'line', data: roll((d) => d.starts)},
+            {name: 'Laufzeit min (Ø 7 T)', type: 'line', data: roll((d) => d.runMinutes)},
+            {name: 'Energie kWh (Ø 7 T)', type: 'line', data: roll((d) => d.kwh)},
+            {name: 'Verdichter Hz (Ø 7 T)', type: 'line', data: roll((d) => d.avgHz)},
+        ],
+        xaxis: {categories: rows.map((d) => d.day)},
+        annotations: {},
+        stroke: {width: 3, curve: 'smooth'},
+        yaxis: [{seriesName: 'Starts (Ø 7 T)', title: {text: 'Starts / kWh'}, decimalsInFloat: 1}, {seriesName: 'Laufzeit min (Ø 7 T)', opposite: true, title: {text: 'min'}, decimalsInFloat: 0}, {seriesName: 'Starts (Ø 7 T)', show: false}, {seriesName: 'Verdichter Hz (Ø 7 T)', opposite: true, title: {text: 'Hz'}, decimalsInFloat: 0}],
+        tooltip: {shared: true},
+    });
+}
+
 function renderTotals(h) {
     const t = h.energyTotals || {months: [], years: []};
     const cell = (x, d = 1) => (x === undefined ? '–' : fmt(x, d));
@@ -234,6 +281,7 @@ async function load(range) {
         tooltip: {shared: true},
     });
     renderHdd(h);
+    renderTrend(h);
     renderTotals(h);
     renderPhases(h);
     renderStates(h);
