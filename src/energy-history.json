@@ -1,1 +1,52 @@
-{"months": {}}
+{
+  "months": {
+    "2025-12": {
+      "consumed": 670.3,
+      "produced": 2350.0
+    },
+    "2026-01": {
+      "consumed": 1150.8,
+      "produced": 3560.9
+    },
+    "2026-02": {
+      "consumed": 803.7,
+      "produced": 2669.0
+    },
+    "2026-03": {
+      "consumed": 453.6,
+      "produced": 1656.7
+    },
+    "2026-04": {
+      "consumed": 467.7,
+      "produced": 1683.6
+    },
+    "2026-05": {
+      "consumed": 239.9,
+      "produced": 779.9
+    },
+    "2026-06": {
+      "consumed": 148.6,
+      "produced": 440.5
+    },
+    "2026-07": {
+      "consumed": 160.3,
+      "produced": 454.6
+    },
+    "2026-08": {
+      "consumed": 124.4,
+      "produced": 346.0
+    },
+    "2026-09": {
+      "consumed": 201.4,
+      "produced": 643.8
+    },
+    "2026-10": {
+      "consumed": 455.3,
+      "produced": 1969.5
+    },
+    "2026-11": {
+      "consumed": 236.6,
+      "produced": 838.6
+    }
+  }
+}

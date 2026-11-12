@@ -84,7 +84,6 @@ function renderSolar(h) {
         ] : []),
         {name: 'Verbrauch Haus (W)', type: 'line', data: sol.load_w || [], width: 2, opacity: 1, dash: 0},
         {name: 'Netz (W, + Bezug / − Einspeisung)', type: 'line', data: net(sol.grid_import_w, sol.grid_export_w), width: 2, opacity: 1, dash: 0},
-        {name: 'Batterie (W, + laden / − entladen)', type: 'line', data: net(sol.charge_w, sol.discharge_w), width: 2, opacity: 1, dash: 0},
         {name: 'Einstrahlung (W/m²)', type: 'line', data: sol.radiation || [], width: 2, opacity: 1, dash: 4},
         {name: 'Batterie-Ladestand (%)', type: 'line', data: sol.soc || [], width: 2, opacity: 1, dash: 0, percent: true},
     ];
