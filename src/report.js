@@ -344,11 +344,35 @@ async function load(range) {
     document.getElementById('state-legend').innerHTML = Object.entries(STATE_COLORS).map(([k, c]) => `<span><i style="background:${c}"></i>${k}</span>`).join('');
 }
 
+let range = '24h';
 const nav = document.getElementById('ranges');
 nav.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     nav.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
-    load(b.dataset.range);
+    range = b.dataset.range;
+    load(range);
 });
-load('24h');
+
+// switch between the heat pump and the solar view; charts are drawn while visible, so reload after switching
+const views = document.getElementById('views');
+function showView(v) {
+    views.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.view === v));
+    document.getElementById('view-heat').hidden = v !== 'heat';
+    document.getElementById('view-solar').hidden = v !== 'solar';
+    try {
+        localStorage.setItem('nano-view', v);
+    } catch {}
+}
+views.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    showView(b.dataset.view);
+    load(range);
+});
+let saved = 'heat';
+try {
+    saved = localStorage.getItem('nano-view') === 'solar' ? 'solar' : 'heat';
+} catch {}
+showView(saved);
+load(range);

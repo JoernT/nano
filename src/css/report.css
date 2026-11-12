@@ -28,3 +28,5 @@ table.phases th { color: var(--muted); font-weight: 400; }
 
 table.totals { table-layout: fixed; }
 table.totals th:first-child { width: 40%; }
+[hidden] { display: none !important; }
+.bar nav#views { margin-left: 0; }

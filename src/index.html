@@ -22,12 +22,17 @@
         <summary><span id="st-badge" class="badge">…</span></summary>
         <div id="st-body" class="panel"></div>
     </details>
+    <nav id="views">
+        <button data-view="heat" class="active">Wärmepumpe</button>
+        <button data-view="solar">Solar</button>
+    </nav>
     <nav id="ranges">
         <button data-range="24h" class="active">24 h</button>
         <button data-range="7d">7 Tage</button>
         <button data-range="30d">30 Tage</button>
     </nav>
 </header>
+<div id="view-heat">
 <div class="wrapper">
     <fx-fore id="nano">
 
@@ -104,18 +109,21 @@
 </div>
 <p id="msg" class="msg">lade …</p>
 <p id="range-info" class="msg range-info"></p>
-<section id="summary" class="tiles"></section>
 <section class="panel"><h2>Raumtemperaturen</h2><div id="c-rooms"></div></section>
 <section class="panel"><h2>Vorlauf Heizung &amp; Warmwasser</h2><div id="c-flow"></div></section>
 <section class="panel"><h2>Heizkurve: Vorlauf vs. Außentemperatur <small id="corr"></small></h2><div id="c-curve"></div></section>
+<section id="summary" class="tiles"></section>
 <section class="panel"><h2>Leistung &amp; Verdichter</h2><div id="c-power"></div></section>
 <section class="panel"><h2>Starts pro Tag &amp; Energie</h2><div id="c-daily"></div></section>
 <section class="panel"><h2>Energie pro Gradtag <small>kWh je Gradtag 20/15, nur volle Tage</small></h2><div id="c-hdd"></div></section>
 <section class="panel"><h2>Trend <small>gleitender 7-Tage-Schnitt; letzte vs. vorherige 7 volle Tage (Zeitraum 30 Tage für mehr Verlauf)</small></h2><div id="trend"></div><div id="c-trend"></div></section>
-<section class="panel"><h2>Solar &amp; Batterie <small>Growatt: PV-Leistung (gesamt und je String), Netz, Batterie-Ladestand; Einstrahlung (Open-Meteo)</small></h2><div id="solar-tiles" class="tiles"></div><div id="c-solar"></div></section>
-<section class="panel"><h2>Energie pro Monat &amp; Jahr <small>Strom gemessen oder vom Display (src/energy-history.json), Wärme nur vom Display; COP = Wärme / Strom</small></h2><div id="totals"></div></section>
 <section class="panel"><h2>Phasen zwischen Änderungen <small>Änderungen in src/experiments.json eintragen</small></h2><div id="phases"></div></section>
 <section class="panel"><h2>Zustände</h2><div id="c-states"></div><p id="state-legend" class="legend"></p></section>
+<section class="panel"><h2>Energie pro Monat &amp; Jahr <small>Strom gemessen oder vom Display (src/energy-history.json), Wärme nur vom Display; COP = Wärme / Strom</small></h2><div id="totals"></div></section>
+</div>
+<div id="view-solar" hidden>
+<section class="panel"><h2>Solar &amp; Batterie <small>Growatt: PV-Leistung (gesamt und je String), Netz, Batterie-Ladestand; Einstrahlung (Open-Meteo)</small></h2><div id="solar-tiles" class="tiles"></div><div id="c-solar"></div></section>
+</div>
 <script type="module" src="report.js"></script>
 <script type="module" src="status.js"></script>
 </body>
