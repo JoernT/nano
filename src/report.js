@@ -106,6 +106,8 @@ function renderSolar(h) {
 // daily balance of the plant: PV yield, house consumption, grid import and export per local day (kWh)
 function renderSolarDay(h) {
     const sol = h.solar || {};
+    // the heat pump's own daily consumption (kWh), already part of the house load
+    const hp = (h.daily || []).filter((d) => d.kwh !== undefined).map((d) => [d.day, Math.round(d.kwh * 10) / 10]);
     const days = [...new Set([sol.pvDaily, sol.loadDaily, sol.importDaily, sol.exportDaily].flatMap((a) => (a || []).map(([d]) => d)))].sort();
     const col = (name, pts, color) => {
         const m = new Map(pts || []);
@@ -114,6 +116,7 @@ function renderSolarDay(h) {
     const specs = [
         col('PV-Ertrag', sol.pvDaily, '#f2a900'),
         col('Verbrauch Haus', sol.loadDaily, '#4c78d0'),
+        col('davon Wärmepumpe', hp, '#8e5bd0'),
         col('Netzbezug', sol.importDaily, '#d1495b'),
         col('Einspeisung', sol.exportDaily, '#3fa34d'),
     ];
